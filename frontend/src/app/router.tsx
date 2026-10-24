@@ -16,7 +16,7 @@ function UnavailablePage({ title }: { title: string }) {
 export function AppRouter() {
   return (
     <Routes>
-      <Route element={<App />}>
+      <Route element={<App />}>asdas
         <Route index element={<Navigate replace to="/setup" />} />
         <Route path="/setup" element={<SetupPage />} />
         <Route path="/interview/:sessionId" element={<InterviewPage />} />
