@@ -1,47 +1,52 @@
-# PrepPressure Team Ownership & Collaboration Protocol
+# Team Ownership and Coordination
 
-## 1. Member Ownership Matrix & Component Mapping
+This project follows a no-waiting workflow: each file has one owner, and work is coordinated so that one person can continue without waiting on another team member.
 
-| Team Member | Domain Ownership | Primary Files & Responsibilities |
-| :--- | :--- | :--- |
-| **Laith Haj Hosin** | Frontend Foundation & Interview Flow | `frontend/src/main.tsx`, `App.tsx`, router, `lib/apiClient.ts`, `types/api.ts`, `features/setup/**`, `features/interview/**` |
-| **Esmaeel Mahfoud** | Session Backend & Scoring Engine | `backend/src/sessions/**`, `scoring.service.ts`, session lifecycle/timing, results APIs, unit/integration tests |
-| **Badr Al Jerf** | Question Schema, APIs & Management Guard | `backend/src/questions/**`, `internal-questions/**`, `guards/internal-tool.guard.ts`, `seed/seed-questions.ts` |
-| **Shiam Ezzo** | Acceptance Testing & Quality Assurance | `docs/TEST-PLAN.md`, acceptance matrix, backend test suites (`*.spec.ts`), verification review |
-| **Adham Albasha** | Question Bank, Results & History Screens | `frontend/src/features/question-bank/**`, `results/**`, `history/**`, shared UI components |
-| **Hassan Alloush** | *Unavailable* | No assigned tasks or delivery dependencies while unavailable. |
+## 1. Ownership rules
 
----
+- Every file has exactly one owner.
+- No two people edit the same file.
+- The only allowed exception is a single registration line added during merge time.
+- Backend modules do not import each other.
+- Frontend features do not import each other.
 
-## 2. Repository Layout & Structure
+## 2. Contract-first workflow
 
-preppressure/
-├── frontend/             # React single-page application
-├── backend/              # NestJS backend application
-├── docs/
-│   ├── API-CONTRACT.md   # Canonical endpoints and DTO definitions
-│   ├── ARCHITECTURE.md   # System architecture and data models
-│   ├── TEAM-OWNERSHIP.md # Team boundaries and Git workflow
-│   └── TEST-PLAN.md      # Acceptance matrix and test suites
-├── README.md             # Setup, installation, and run instructions
-├── .gitignore            # Excludes node_modules, build output, .env, audio
-└── .env.example          # Environment variable template (no secrets)
+The API contract is treated as the source of truth before implementation begins.
 
+- The contract fixes URLs, field names, error codes, collection names, and stored document shapes.
+- Everyone implements against the contract, not each other’s code.
 
+## 3. Git workflow
 
----
+- Work in feature branches.
+- Keep each branch focused on one owner’s work.
+- Open PRs after validating the area in isolation.
+- Merge only after reviewing the contract and impact on other modules.
+- Keep merge conflicts minimal by separating ownership domains.
 
-## 3. Git Workflow & Collaboration Rules
-* **Branching Strategy:** Work must be performed on short-lived feature or fix branches (`feature/<name>` or `fix/<name>`). Small, atomic pull requests are required.
-* **No Direct Pushes:** Direct commits to `main` are strictly prohibited. Every PR requires peer review and passing test checks.
-* **Secret Management:** Never commit `node_modules`, build artifacts, `.env` files, real API keys, database dumps, or local audio recordings. Always commit `.env.example` with variable names only.
-* **Conflict Resolution:** If implementation boundaries overlap (e.g., shared API types or router manifests), the designated owner coordinates and reviews changes. Do not independently invent endpoint aliases or unagreed payload fields.
+## 4. Integration day
 
----
+On the integration day, the team combines independently validated modules.
 
-## 4. Contract-First Integration Workflow
-1. **Contract Agreement:** All team members agree on `docs/API-CONTRACT.md` before coding API-dependent features.
-2. **Mock Generation:** Laith generates shared TypeScript interfaces and mock JSON fixtures matching the contract so frontend development can proceed in parallel.
-3. **Backend Implementation:** Esmaeel and Badr implement exact payload shapes and validate responses against test fixtures.
-4. **Quality & Acceptance:** Shiam executes the acceptance test matrix (`TEST-PLAN.md`) across all integration boundaries.
-5. **Contract Updates:** Any approved contract modification requires an atomic update across the documentation, backend DTOs/controllers, frontend client types/mocks, and test suites.
+- Backend checks run in a single integrated environment.
+- Frontend feature pages are wired together using route URLs rather than direct imports.
+- The contract is re-checked before deployment or release.
+
+## 5. Coordination expectations
+
+- If a file change impacts the API contract, the contract coordinator must review the PR.
+- Frontend pages should use URL-based navigation between features.
+- Shared data should be pulled from the backend or mocks, not from another feature’s internal state.
+
+## 6. Person-specific ownership
+
+- Laith: frontend shell, auth pages, take-interview flow, results, profile
+- Esmaeel: backend attempts handling and results logic
+- Badr: backend platform, auth, user profile stats, Swagger
+- Shiam: backend questions and interviews modules, full-flow testing
+- Adham: frontend questions and interviews pages
+
+## 7. Working principle
+
+The team’s goal is to finish independently without blocking each other. The contract and ownership model make this possible.

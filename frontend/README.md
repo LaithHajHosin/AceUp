@@ -1,13 +1,16 @@
-# PrepPressure frontend
+﻿# PrepPressure frontend
 
-The frontend is a React, TypeScript, and Vite application. From this directory:
+The frontend is the React + TypeScript client for the PrepPressure practice platform. The current app is aligned with the v3 workflow: login/register, protected routes, JWT-backed user session, interview attempts, result review, and profile viewing.
+
+## Local setup
 
 ```powershell
+cd frontend
 npm install
 npm run dev
 ```
 
-The development server prints the local URL. To build and lint:
+## Production checks
 
 ```powershell
 npm run build
@@ -16,18 +19,19 @@ npm run lint
 
 ## API configuration
 
-The client calls `http://localhost:3000/api/v1` by default. Set
-`VITE_API_BASE_URL` in a local `.env` file to use a different API base URL, for
-example:
+The client reads its API base from `VITE_API_BASE_URL` and defaults to `http://localhost:3000/api/v1`.
 
 ```dotenv
 VITE_API_BASE_URL=http://localhost:3000/api/v1
 ```
 
-Do not put secrets in Vite environment variables: values prefixed with `VITE_`
-are included in the browser bundle. The internal question-management key must
-never be provided to the frontend.
+Never place secrets or internal keys in frontend environment variables. The browser exposes `VITE_*` values.
 
-The Setup and Interview flows use the request and response shapes documented in
-[`../docs/API-CONTRACT.md`](../docs/API-CONTRACT.md). They require the backend
-question and session endpoints to be running.
+## Project docs
+
+- [`../docs/SPECIFICATION.md`](../docs/SPECIFICATION.md)
+- [`../docs/API-CONTRACT.md`](../docs/API-CONTRACT.md)
+- [`../docs/TEAM-OWNERSHIP.md`](../docs/TEAM-OWNERSHIP.md)
+- [`../docs/04_Laith_Tasks.md`](../docs/04_Laith_Tasks.md)
+
+The frontend depends on the authenticated API routes described in the contract, including auth, attempts, results, and profile views.

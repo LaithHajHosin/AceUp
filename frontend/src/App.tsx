@@ -1,18 +1,29 @@
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { useAuth } from './features/auth/AuthContext'
 import './App.css'
 
 const navigation = [
-  { label: 'Question bank', path: '/questions' },
   { label: 'Practice setup', path: '/setup' },
-  { label: 'Results', path: '/results' },
-  { label: 'History', path: '/history' },
+  { label: 'Interview', path: '/interviews/1/take' },
+  { label: 'Profile', path: '/profile' },
 ]
 
 function App() {
+  const { isAuthenticated, user, logout } = useAuth()
+  const location = useLocation()
+
+  if (location.pathname === '/login' || location.pathname === '/register') {
+    return (
+      <div className="auth-shell">
+        <Outlet />
+      </div>
+    )
+  }
+
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <NavLink className="brand" to="/setup" aria-label="PrepPressure home">
+        <NavLink className="brand" to={isAuthenticated ? '/setup' : '/login'} aria-label="PrepPressure home">
           <span className="brand-mark">P</span>
           <span>
             <strong>PrepPressure</strong>
@@ -22,12 +33,12 @@ function App() {
 
         <div className="nav-label">Workspace</div>
         <nav className="main-nav" aria-label="Main navigation">
-          {navigation.map(({ label, path }) => (
+          {isAuthenticated && navigation.map(({ label, path }) => (
             <NavLink
               className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
               key={path}
               to={path}
-              end={path !== '/results'}
+              end={path !== '/interviews/1/take'}
             >
               <span className="nav-indicator" aria-hidden="true" />
               {label}
@@ -39,13 +50,21 @@ function App() {
           <span className="note-icon" aria-hidden="true">i</span>
           <p>Practice sessions are private to this browser. Use a nickname, not sensitive personal information.</p>
         </div>
-        <div className="sidebar-footer">Build confidence, one question at a time.</div>
+
+        {isAuthenticated && (
+          <div className="sidebar-footer">
+            <div className="nav-user">{user?.displayName ?? 'User'}</div>
+            <button className="secondary-button" onClick={logout} type="button">
+              Logout
+            </button>
+          </div>
+        )}
       </aside>
 
       <div className="app-content">
         <header className="topbar">
           <span className="breadcrumb">Your workspace <span>/</span> Practice</span>
-          <span className="status-pill"><span /> Interview prep</span>
+          <span className="status-pill"><span /> {isAuthenticated ? 'Interview prep' : 'Signed out'}</span>
         </header>
         <main className="page-content">
           <Outlet />
