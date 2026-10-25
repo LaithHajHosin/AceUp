@@ -1,0 +1,72 @@
+import type { OwnerQuestion, PublicQuestion } from "./types";
+
+export const mockQuestions: OwnerQuestion[] = [
+  {
+    id: 1,
+    ownerId: 1,
+    ownerUsername: "adham",
+    prompt: "Which method converts JSON text into a JavaScript value?",
+    category: "javascript",
+    difficulty: "easy",
+    type: "multiple_choice",
+    choices: [
+      { id: "a", text: "JSON.parse", isCorrect: true },
+      { id: "b", text: "JSON.stringify", isCorrect: false },
+      { id: "c", text: "JSON.convert", isCorrect: false },
+    ],
+    codeSnippet: null,
+    expectedKeywords: null,
+    requiredKeywordCount: null,
+    expectedOutput: null,
+    createdAt: "2026-10-24T10:00:00.000Z",
+    updatedAt: "2026-10-24T10:00:00.000Z",
+  },
+  {
+    id: 2,
+    ownerId: 2,
+    ownerUsername: "demo-user",
+    prompt: "Explain the difference between let and const.",
+    category: "javascript",
+    difficulty: "medium",
+    type: "short_answer",
+    choices: null,
+    codeSnippet: null,
+    expectedKeywords: ["reassignment", "block scope"],
+    requiredKeywordCount: 1,
+    expectedOutput: null,
+    createdAt: "2026-10-23T10:00:00.000Z",
+    updatedAt: "2026-10-23T10:00:00.000Z",
+  },
+  {
+    id: 3,
+    ownerId: 1,
+    ownerUsername: "adham",
+    prompt: "What is the output of this JavaScript code?",
+    category: "javascript",
+    difficulty: "hard",
+    type: "code_output",
+    choices: null,
+    codeSnippet: 'console.log(2 + "2")',
+    expectedKeywords: null,
+    requiredKeywordCount: null,
+    expectedOutput: "22",
+    createdAt: "2026-10-22T10:00:00.000Z",
+    updatedAt: "2026-10-22T10:00:00.000Z",
+  },
+];
+
+export function publicQuestion(question: OwnerQuestion): PublicQuestion {
+  return {
+    id: question.id,
+    ownerId: question.ownerId,
+    ownerUsername: question.ownerUsername,
+    prompt: question.prompt,
+    category: question.category,
+    difficulty: question.difficulty,
+    type: question.type,
+    choices: question.choices?.map(({ id, text }) => ({ id, text })) ?? null,
+    codeSnippet: question.codeSnippet,
+    createdAt: question.createdAt,
+    updatedAt: question.updatedAt,
+  };
+}
