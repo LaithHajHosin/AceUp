@@ -1,232 +1,326 @@
-# PrepPressure API Contract
+# PrepPressure — API Contract (v3) — FROZEN
 
-**Version:** 1.0  
-**Base path:** `/api/v1`  
-**Content type:** `application/json`  
-**Source:** PrepPressure Master Project Specification and team implementation guides.
+> Commit as `docs/API-CONTRACT.md` **before anyone writes code**. Everyone codes against this file. Changing anything here (URL, field name, enum value, error code, collection name, stored field) requires the whole team to agree in a PR that updates this file first. Laith coordinates contract PRs.
 
-This document is the shared API source of truth. Do not independently rename routes, fields, enum values, status values, or error codes. An approved contract change must update backend DTOs/controllers, frontend types/client/mocks, Swagger, and tests in the same change.
+Base URL: `/api/v1` (Swagger UI is at `/docs`, outside the prefix).
 
-## Conventions
+---
 
-- IDs are numeric application IDs. Do not expose MongoDB ObjectIds.
-- Public routes below require no account authentication. The internal question-management routes require `x-internal-tool-key`.
-- All request bodies and query parameters must be validated. Whitelist known fields and reject unknown fields.
-- Use stable error envelopes: `{ "statusCode": number, "code": string, "message": string, "details"?: object }`.
-- Public question/session data must not reveal answer keys or scoring internals while a session is active.
-- Enum values are case-sensitive.
+## 1. Authentication
 
-## Shared enums
+- Every endpoint requires `Authorization: Bearer <accessToken>` **except** `POST /auth/register` and `POST /auth/login`.
+- JWT payload: `{ "sub": <userId number>, "username": "<username>" }`. Secret from `JWT_SECRET`, lifetime from `JWT_EXPIRES_IN` (default `1h`).
+- After the global guard verifies the token, every controller can read the current user from the request as:
 
 ```ts
-type QuestionType = "multiple_choice" | "short_answer" | "code_output";
-type Difficulty = "easy" | "medium" | "hard";
-type SessionStatus = "in_progress" | "finished" | "timed_out";
+request.user = { userId: number, username: string }
 ```
 
-## Public question DTOs
+This shape is **frozen**. Modules read `request.user.userId` themselves (via `@Req()` or their own small local decorator). They do **not** import anything from the auth module.
 
-A question's stored/internal model may include private scoring fields; public DTOs must not.
+- Missing / invalid / expired token → `401` with code `UNAUTHORIZED`.
 
-```ts
-interface QuestionChoicePublicDto {
-  id: string;
-  text: string;
-}
+---
 
-interface QuestionPublicDto {
-  id: number;
-  prompt: string;
-  category: string;
-  difficulty: Difficulty;
-  type: QuestionType;
-  choices?: QuestionChoicePublicDto[]; // multiple_choice only
-  codeSnippet?: string; // code_output display-only text, if present
-}
-interface QuestionListResponse { items: QuestionPublicDto[]; }
+## 2. Error format
+
+All errors use NestJS's normal shape plus a stable `code`:
+
+```json
+{ "statusCode": 409, "error": "Conflict", "code": "QUESTION_IN_USE", "message": "Human readable text" }
 ```
 
-Never include `isCorrect`, `expectedKeywords`, `requiredKeywordCount`, or `expectedOutput` in public question responses. `codeSnippet` is inert display text and must never be executed.
+Validation errors (400) keep Nest's `message` array and use `code: "VALIDATION_FAILED"` where you throw them yourself; errors produced automatically by the global `ValidationPipe` may lack `code` — the frontend must handle both.
 
-## Session and answer DTOs
+| Code | Status | When |
+| --- | --- | --- |
+| `VALIDATION_FAILED` | 400 | Bad body / query, unknown field |
+| `UNAUTHORIZED` | 401 | No / bad / expired token |
+| `INVALID_CREDENTIALS` | 401 | Wrong login |
+| `NOT_OWNER` | 403 | Editing/deleting/reading something you don't own (where ownership is required) |
+| `NOT_FOUND` | 404 | Unknown id |
+| `USERNAME_TAKEN` / `EMAIL_TAKEN` | 409 | Register conflicts |
+| `QUESTION_IN_USE` | 409 | Delete a question used by an interview or attempt |
+| `QUESTION_NOT_FOUND_IN_LIST` | 400 | Interview `questionIds` contains an id that doesn't exist |
+| `ATTEMPT_ENDED` | 409 | Answer/finish on a finished or timed-out attempt |
+| `ATTEMPT_NOT_ENDED` | 409 | Results requested while attempt in progress |
+| `ANSWER_DUPLICATE` | 409 | Second answer for the same question |
+| `ANSWER_LATE` | 409 | Answer after `deadlineAt + 5s` (attempt becomes `timed_out`) |
+| `QUESTION_NOT_IN_ATTEMPT` | 400 | Answer for a question not in this attempt |
+| `ANSWER_TYPE_MISMATCH` | 400 | Answer type differs from question type |
+| `INVALID_CHOICE` | 400 | `choiceId` not in the question's choices |
 
-```ts
-interface CreateSessionRequest {
-  displayName: string; // trimmed, 1–80 chars
-  category: string;
-  difficulty: Difficulty;
-  questionCount: number; // integer 5–10
-}
+---
 
-type AnswerPayload =
-  | { type: "multiple_choice"; choiceId: string }
-  | { type: "short_answer"; text: string }
-  | { type: "code_output"; text: string };
+## 3. Shared enums (frozen)
 
-interface SubmitAnswerRequest {
-  questionId: number;
-  answer: AnswerPayload;
-}
+- `difficulty`: `easy` | `medium` | `hard`
+- `questionType`: `multiple_choice` | `short_answer` | `code_output`
+- `attemptStatus`: `in_progress` | `finished` | `timed_out`
+- `readiness`: `needs_practice` | `almost_ready` | `ready`
+- `category`: free text, 2–40 chars, stored lowercase and trimmed (e.g. `arrays`, `javascript`)
+
+All dates are ISO 8601 strings in UTC. All ids are positive integers.
+
+---
+
+## 4. Auth & Users — owner: Badr
+
+### POST /auth/register (public)
+
+Body:
+
+```json
+{ "username": "alex_dev", "email": "alex@example.com", "password": "secret123", "displayName": "Alex" }
 ```
 
-Create-session success returns a safe session representation containing `id`, `displayName`, `category`, `difficulty`, `questionCount`, `status`, `startedAt`, `deadlineAt`, `timePerQuestionSeconds`, and safe question snapshots. Session detail uses the same safety rule: while `status` is `in_progress`, no expected answers, correct-choice flags, keyword criteria, expected output, or score internals may be sent.
+Rules: `username` 3–30 chars, `^[a-z0-9_]+$` after lowercasing; valid email; `password` 8–72 chars; `displayName` 2–50. `201` → same body as login response. `409 USERNAME_TAKEN / EMAIL_TAKEN`.
 
-An accepted answer is stored with `questionId`, `type`, the matching `choiceId` or `text`, and `submittedAt`. The server determines correctness and score; clients may not submit `score`, `isCorrect`, `expectedOutput`, `keywords`, or `status`.
+### POST /auth/login (public)
 
-## Endpoints
-
-### Question bank
-
-| Method and path | Access | Contract |
-|---|---|---|
-| `GET /questions` | Public | Returns `{ items: QuestionPublicDto[] }` for active questions only. Optional filters: `category`, `difficulty`, `type`; filters combine. |
-| `GET /questions/:id` | Public | Safe public question detail by numeric ID; `404` if not found. |
-
-### Sessions
-
-| Method and path | Access | Contract |
-|---|---|---|
-| `POST /sessions` | Public | Create a session with 5–10 distinct, randomly selected active questions matching category and difficulty. |
-| `GET /sessions/:id` | Public | Current session state and safe question snapshots. No expected-answer data while active. |
-| `POST /sessions/:id/answers` | Public | Accept one answer per session question, validate membership/type/choice/deadline. |
-| `POST /sessions/:id/finish` | Public | Finish manually and persist score. Ended states are terminal and immutable. Repeated finish after end returns existing ended state. |
-| `GET /sessions/:id/results` | Public | `409 SESSION_NOT_ENDED` until finished or timed out; then return score and per-question explanations. |
-
-### History
-
-| Method and path | Access | Contract |
-|---|---|---|
-| `GET /history?displayName=...` | Public | History lookup by exact display name; query value must be URL-encoded by clients. |
-| `GET /history/:sessionId` | Public | Past session detail and saved answers, with active-session privacy redaction. |
-
-History lookup by display name and numeric session ID is **not authentication** and does not provide account privacy. UI and README must warn users not to use sensitive personal information.
-
-### Internal question management
-
-All routes below require `x-internal-tool-key`; the backend reads the expected value from `INTERNAL_TOOL_KEY`. Fail closed when unset, never hardcode/commit the secret, and never expose it to the frontend.
-
-| Method and path | Access | Contract |
-|---|---|---|
-| `POST /internal/questions` | Guarded | Create a validated question. |
-| `PATCH /internal/questions/:id` | Guarded | Update a question after validating the complete resulting shape. Existing session snapshots must not change. |
-| `PATCH /internal/questions/:id/deactivate` | Guarded | Set `active=false`; preserve the record and history. |
-| `DELETE /internal/questions/:id` | Guarded | Delete only if never referenced by a session; otherwise `409 QUESTION_IN_USE`. Recommend deactivation instead. |
-
-## Validation and behavior
-
-### Question rules
-
-Stored question model:
-
-```ts
-interface Question {
-  id: number;
-  prompt: string;
-  category: string;
-  difficulty: Difficulty;
-  type: QuestionType;
-  active: boolean;
-  choices?: { id: string; text: string; isCorrect: boolean }[];
-  expectedKeywords?: string[];
-  requiredKeywordCount?: number;
-  expectedOutput?: string;
-  codeSnippet?: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
-```
-
-- `prompt` and `category` are trimmed and non-empty; prompt max 2000 characters is recommended.
-- `multiple_choice`: 2–6 choices, unique choice IDs, non-empty choice text, exactly one `isCorrect=true`.
-- `short_answer`: 2–6 non-empty expected keywords; `requiredKeywordCount` is an integer from 1 through keyword count.
-- `code_output`: non-empty `expectedOutput` (maximum 1000 characters unless explicitly agreed otherwise); optional `codeSnippet` is display-only.
-- Reject fields irrelevant to the selected type. PATCH must not produce an invalid type/field combination.
-- Public DTOs always redact answer-key fields.
-
-### Session creation and timing
-
-- Trim and validate `displayName` (1–80 chars), category, difficulty, and integer `questionCount` (5–10).
-- Select distinct active questions matching category and difficulty. If fewer than requested are available, return `409 INSUFFICIENT_QUESTIONS` with `details.availableCount`; do not silently reduce the requested count.
-- `startedAt` is server time. Time per question: easy `60` seconds, medium `90`, hard `120`. `deadlineAt = startedAt + questionCount × timePerQuestionSeconds`.
-- Session snapshots are the source of truth for scoring and historical results. Editing/deactivating a question must not alter an existing session.
-
-### Answer submission
-
-- Session ID not found: `404 SESSION_NOT_FOUND` (or consistent `SESSION_NOT_FOUND` error).
-- Only `in_progress` sessions accept answers; otherwise `409 SESSION_NOT_ACTIVE`.
-- Deadline enforcement uses server time and a 5,000 ms grace period. After `deadlineAt + 5000ms`, mark the session `timed_out`, persist finish time and score, and reject the answer.
-- Question must belong to the session snapshot; otherwise `QUESTION_NOT_IN_SESSION`.
-- At most one accepted answer per question; duplicate returns `409 DUPLICATE_ANSWER`. Enforce atomically/serially to cover races.
-- Answer type must match the question (`ANSWER_TYPE_MISMATCH`). MC `choiceId` must be one of the offered choices (`INVALID_CHOICE`).
-- Short-answer and code-output `text` must be non-empty and at most 1000 characters.
-- Reject unknown fields, including client-supplied score/correctness/expected answer fields.
-
-### Scoring
-
-- Difficulty points: easy = 1, medium = 2, hard = 3.
-- Multiple choice: correct choice gets full points; incorrect or unanswered gets zero.
-- Short answer: count expected keywords found as case-insensitive substrings. Matches at least `requiredKeywordCount` = full points; 1 through required-count-minus-one = half points; zero or unanswered = zero. Results explain matched keywords.
-- Code output: normalize CRLF and CR to LF, trim outer whitespace, then exact string compare to expected output. Full or zero points only. Never execute code.
-- Percentage = earned / possible × 100, rounded to one decimal.
-- Readiness: `Ready` at 85% or higher; `Almost ready` at 60% through below 85%; `Needs practice` below 60%.
-- Scoring must be deterministic and pure/testable. Persist final score at finish/timeout or deterministically recalculate from immutable snapshots.
-
-### Results
-
-Results are available only after `finished` or `timed_out`. Include earned/possible points, percentage, readiness level, terminal status, and per-question submitted/expected answer, points awarded/possible, and deterministic explanation. Short-answer explanations include matched keywords. MC may reveal the correct choice only after the session ends.
-
-## Error codes
-
-At minimum, keep these stable where applicable:
-
-| HTTP | Code | Meaning |
-|---:|---|---|
-| 400 | `VALIDATION_ERROR` | Invalid request or unknown field |
-| 401 | `UNAUTHORIZED` | Missing/invalid internal key |
-| 404 | `QUESTION_NOT_FOUND` | Numeric question ID does not exist |
-| 404 | `SESSION_NOT_FOUND` | Numeric session ID does not exist |
-| 409 | `INSUFFICIENT_QUESTIONS` | Not enough matching active questions; include `details.availableCount` |
-| 409 | `SESSION_NOT_ACTIVE` | Session is not in progress |
-| 409 | `SESSION_NOT_ENDED` | Results requested before terminal state |
-| 409 | `DUPLICATE_ANSWER` | Question already has an accepted answer |
-| 409 | `QUESTION_NOT_IN_SESSION` | Question is not in the session snapshot |
-| 400 | `ANSWER_TYPE_MISMATCH` | Submitted answer type differs from question type |
-| 400 | `INVALID_CHOICE` | Choice ID is not offered for that question |
-| 409 | `QUESTION_IN_USE` | Question has been referenced by a session |
-
-Use a consistent envelope: `{ "statusCode": 409, "code": "INSUFFICIENT_QUESTIONS", "message": "...", "details": { "availableCount": 3 } }`.
-
-## Example requests
-
-Create session:
+Body: `{ "usernameOrEmail": "alex_dev", "password": "secret123" }` `200`:
 
 ```json
 {
-  "displayName": "Alex",
-  "category": "arrays",
-  "difficulty": "medium",
-  "questionCount": 5
+  "accessToken": "eyJ...",
+  "tokenType": "Bearer",
+  "expiresIn": 3600,
+  "user": { "id": 1, "username": "alex_dev", "email": "alex@example.com", "displayName": "Alex", "bio": null, "createdAt": "..." }
 }
 ```
 
-Submit a short answer:
+`401 INVALID_CREDENTIALS` (same message whether username or password is wrong).
+
+### GET /auth/me
+
+`200` → `PrivateUser` (the `user` object above, includes `email`).
+
+### PATCH /users/me
+
+Body (all optional): `{ "displayName": "Alex B", "bio": "Backend learner" }` (`bio` max 300, may be `null`). `200` → `PrivateUser`.
+
+### GET /users/:id/profile
+
+`200`:
 
 ```json
 {
-  "questionId": 104,
-  "answer": {
-    "type": "short_answer",
-    "text": "A stack uses last-in, first-out order."
+  "user": { "id": 1, "username": "alex_dev", "displayName": "Alex", "bio": null, "createdAt": "..." },
+  "stats": {
+    "questionsCreated": 12,
+    "interviewsCreated": 3,
+    "attemptsCompleted": 7,
+    "attemptsInProgress": 1,
+    "questionsAnswered": 41,
+    "averagePercentage": 72.4,
+    "bestPercentage": 95.0
   }
 }
 ```
 
-Multiple choice uses `{ "type": "multiple_choice", "choiceId": "b" }`; code output uses `{ "type": "code_output", "text": "predicted output" }`.
+`PublicUser` (inside `user`) never includes `email` or `passwordHash`. `404 NOT_FOUND`.
 
-## Operational requirements
+---
 
-- Document all routes, DTOs, headers, status codes and errors in Swagger.
-- Log session creation, accepted/rejected answer metadata, finish/timeout and question-management events. Do not log full free-text answers, expected keys, or internal secrets.
-- Use MongoDB/Mongoose ordinary queries; no aggregation, `populate`, or ObjectId references. Use a shared numeric ID sequence service.
-- History index: `{ displayNameNormalized: 1, startedAt: -1 }`.
--
+## 5. Questions — owner: Shiam
+
+`PublicQuestion` (everyone):
+
+```json
+{
+  "id": 104, "ownerId": 1, "ownerUsername": "alex_dev",
+  "prompt": "What does this print?", "category": "javascript", "difficulty": "medium", "type": "code_output",
+  "choices": null, "codeSnippet": "console.log(1 + '1')",
+  "createdAt": "...", "updatedAt": "..."
+}
+```
+
+For `multiple_choice`, `choices = [{ "id": "a", "text": "..." }]` (no `isCorrect`). For others `choices` is `null`. `codeSnippet` is `null` except for `code_output`.
+
+`OwnerQuestion` (only when requester is the owner) = `PublicQuestion` + `choices[].isCorrect`, `expectedKeywords`, `requiredKeywordCount`, `expectedOutput` (`null` when not relevant).
+
+`ownerUsername` is read from the `users` collection (see section 8) — `null` if the user no longer exists.
+
+### GET /questions
+
+Query (all optional): `category`, `difficulty`, `type`, `ownerId`, `search` (substring of prompt, case-insensitive). Unknown query fields → 400. `200` → `PublicQuestion[]` (owner's own questions may come back as `OwnerQuestion`), newest first.
+
+### GET /questions/:id
+
+`200` → `OwnerQuestion` if requester is owner, otherwise `PublicQuestion`. `404`.
+
+### POST /questions
+
+Body (common + type-specific):
+
+```json
+{ "prompt": "...", "category": "arrays", "difficulty": "easy", "type": "multiple_choice",
+  "choices": [ { "id": "a", "text": "O(1)", "isCorrect": true }, { "id": "b", "text": "O(n)", "isCorrect": false } ] }
+```
+
+```json
+{ "prompt": "...", "category": "stacks", "difficulty": "medium", "type": "short_answer",
+  "expectedKeywords": ["lifo", "push", "pop"], "requiredKeywordCount": 2 }
+```
+
+```json
+{ "prompt": "...", "category": "javascript", "difficulty": "hard", "type": "code_output",
+  "codeSnippet": "console.log([1,2].map(x => x * 2))", "expectedOutput": "[ 2, 4 ]" }
+```
+
+Rules: `prompt` 5–2000; MC: 2–6 choices, choice ids unique 1–10 chars, exactly one `isCorrect: true`; short answer: 2–6 non-empty keywords, `requiredKeywordCount` 1..keywords; code output: `expectedOutput` non-empty, `codeSnippet` 0–5000. Fields that belong to another type → 400. `ownerId` comes from the token, never from the body. `201` → `OwnerQuestion`.
+
+### PATCH /questions/:id (owner only)
+
+Body: any subset of the POST fields. The **resulting** question must still be valid (e.g. changing `type` requires the new type's fields). `200` → `OwnerQuestion`. `403 NOT_OWNER`, `404`.
+
+### DELETE /questions/:id (owner only)
+
+`204`. `409 QUESTION_IN_USE` if the id appears in any interview's `questionIds` or any attempt's `questions[].questionId`.
+
+---
+
+## 6. Interviews — owner: Shiam
+
+`InterviewSummary`:
+
+```json
+{ "id": 7, "ownerId": 1, "ownerUsername": "alex_dev", "title": "Arrays warm-up", "description": "...",
+  "category": "arrays", "difficulty": "easy", "questionCount": 5, "timeLimitSeconds": 600,
+  "createdAt": "...", "updatedAt": "..." }
+```
+
+`InterviewDetail` = `InterviewSummary` + `"questions": PublicQuestion[]` (in `questionIds` order; **always the public form**, even for the owner; deleted questions are skipped).
+
+### GET /interviews
+
+Query (optional): `category`, `difficulty`, `ownerId`, `search` (in title). `200` → `InterviewSummary[]`, newest first.
+
+### GET /interviews/:id
+
+`200` → `InterviewDetail`. `404`.
+
+### POST /interviews
+
+```json
+{ "title": "Arrays warm-up", "description": "Five quick questions", "category": "arrays", "difficulty": "easy",
+  "questionIds": [104, 105, 110], "timeLimitSeconds": 600 }
+```
+
+Rules: `title` 3–100; `description` 0–1000; `questionIds` 1–20 distinct integers that all exist (any user's questions may be used) → otherwise `400 QUESTION_NOT_FOUND_IN_LIST`; `timeLimitSeconds` 30–3600. `201` → `InterviewDetail`.
+
+### PATCH /interviews/:id (owner only)
+
+Any subset of POST fields, same rules. `200` → `InterviewDetail`. `403`, `404`.
+
+### DELETE /interviews/:id (owner only)
+
+`204`. Attempts that used it are not touched.
+
+---
+
+## 7. Attempts — owner: Esmaeel
+
+`AttemptQuestion` (safe, used while in progress):
+
+```json
+{ "questionId": 104, "position": 1, "prompt": "...", "type": "multiple_choice", "difficulty": "easy",
+  "category": "arrays", "choices": [ { "id": "a", "text": "O(1)" } ], "codeSnippet": null }
+```
+
+`Attempt`:
+
+```json
+{ "id": 33, "interviewId": 7, "interviewTitle": "Arrays warm-up", "userId": 2,
+  "status": "in_progress", "startedAt": "...", "deadlineAt": "...", "finishedAt": null,
+  "timeLimitSeconds": 600, "questions": [ "AttemptQuestion..." ],
+  "answeredQuestionIds": [104] }
+```
+
+### POST /attempts
+
+Body: `{ "interviewId": 7 }`. `201` → `Attempt`. `404` if interview missing. Copies interview title/time limit and a snapshot of every question (including private scoring data, stored only internally).
+
+### GET /attempts
+
+Query (optional): `status`, `interviewId`. Returns **only the current user's** attempts, newest first:
+
+```json
+[ { "id": 33, "interviewId": 7, "interviewTitle": "Arrays warm-up", "status": "finished",
+    "startedAt": "...", "finishedAt": "...", "score": 3.5, "maxScore": 5,
+    "percentage": 70.0, "readiness": "almost_ready" } ]
+```
+
+(`score`, `maxScore`, `percentage`, `readiness` are `null` while in progress.)
+
+### GET /attempts/:id
+
+Owner of the attempt only (`403`). Applies lazy timeout first. `200` → `Attempt`.
+
+### POST /attempts/:id/answers
+
+```json
+{ "questionId": 104, "answer": { "type": "multiple_choice", "choiceId": "a" } }
+{ "questionId": 105, "answer": { "type": "short_answer", "text": "A stack is LIFO: push and pop" } }
+{ "questionId": 110, "answer": { "type": "code_output", "text": "[ 2, 4 ]" } }
+```
+
+`text` max 2000. `201` → `{ "questionId": 104, "accepted": true, "submittedAt": "..." }` (no correctness revealed). Errors: `ATTEMPT_ENDED`, `ANSWER_LATE`, `ANSWER_DUPLICATE`, `QUESTION_NOT_IN_ATTEMPT`, `ANSWER_TYPE_MISMATCH`, `INVALID_CHOICE`, `403`.
+
+### POST /attempts/:id/finish
+
+`200` → `Attempt` with status `finished`. `409 ATTEMPT_ENDED` if already ended.
+
+### GET /attempts/:id/results
+
+Owner only. `409 ATTEMPT_NOT_ENDED` while in progress (after applying lazy timeout). `200`:
+
+```json
+{
+  "attemptId": 33, "interviewId": 7, "interviewTitle": "Arrays warm-up",
+  "status": "finished",
+  "startedAt": "...", "finishedAt": "...", "score": 3.5, "maxScore": 5,
+  "percentage": 70.0, "readiness": "almost_ready",
+  "items": [
+    { "questionId": 105, "position": 2, "prompt": "...", "type": "short_answer",
+      "submitted": { "text": "A stack is LIFO" }, "expected": { "expectedKeywords": ["lifo","push","pop"], "requiredKeywordCount": 2 },
+      "points": 0.5, "maxPoints": 1, "explanation": "Matched 1 of 2 required keywords (lifo): half credit." }
+  ]
+}
+```
+
+`submitted` is `null` for unanswered questions. `expected` is `{ "correctChoiceId": "a" }` for MC and `{ "expectedOutput": "..." }` for code output.
+
+---
+
+## 8. MongoDB storage contract (frozen)
+
+Each module **owns** its collection(s) and is the only one that writes to them. Other modules may **read** them with the native driver (`connection.collection('<name>')`) using only the fields listed here. Public `id` is a numeric field; Mongo's `_id` is never returned.
+
+| Collection | Writer | Stored fields other modules may read |
+| --- | --- | --- |
+| `users` | Badr | `id`, `username`, `displayName` |
+| `questions` | Shiam | `id`, `ownerId`, `prompt`, `category`, `difficulty`, `type`, `choices` (`{id,text,isCorrect}`), `codeSnippet`, `expectedKeywords`, `requiredKeywordCount`, `expectedOutput` |
+| `interviews` | Shiam | `id`, `ownerId`, `title`, `questionIds`, `timeLimitSeconds` |
+| `attempts` | Esmaeel | `id`, `userId`, `interviewId`, `status`, `percentage`, `questions` (array; each item has `questionId`), `answers` (array) |
+| `counters` | everyone, own key only | `{ _id: "<key>", seq: number }` with keys `users`, `questions`, `interviews`, `attempts` |
+
+Numeric ids: each module writes its **own private helper** that does an atomic `findOneAndUpdate({ _id: '<its key>' }, { $inc: { seq: 1 } }, { upsert: true, returnDocument: 'after' })` on `counters`. Each module touches only its own key, so there is no shared code.
+
+Required indexes (each owner creates their own):
+
+- `users`: unique `username`, unique `email`, unique `id`
+- `questions`: unique `id`; `{ category: 1, difficulty: 1, type: 1 }`; `{ ownerId: 1 }`
+- `interviews`: unique `id`; `{ ownerId: 1 }`; `{ questionIds: 1 }`
+- `attempts`: unique `id`; `{ userId: 1, startedAt: -1 }`; `{ "questions.questionId": 1 }`
+
+---
+
+## 9. Frontend shared conventions (frozen)
+
+- API base URL: `import.meta.env.VITE_API_URL` (e.g. `http://localhost:3000/api/v1`).
+- Token storage: `localStorage` key `preppressure.token`; current user JSON in `preppressure.user`.
+- Every feature API file sends `Authorization: Bearer <token>` when the token exists.
+- On any `401` response, the API file removes both keys and dispatches `window.dispatchEvent(new Event('preppressure:logout'))`. Laith's auth context listens for this event and redirects to `/login`.
+- Mocks: when `import.meta.env.VITE_USE_MOCKS === 'true'`, each feature API file returns data from its own `mocks.ts` instead of calling the backend.
+- Route paths are the ones in the specification, section 10.

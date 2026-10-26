@@ -1,209 +1,131 @@
-# Integration Guide for Leader Laith & Esmaeel — Merging into `main`
+# Team Integration Guide (`main`) & v2-to-v3 Questions Handoff
 
-**Author:** Badr Al Jerf  
-**Target Audience:**  
-- **Laith Haj Hosin** (Team Leader, Repository Integration, `main.ts`, `app.module.ts`, & Frontend Setup/Interview Connection)  
-- **Esmaeel Mahfoud** (Sessions Backend, Question Snapshots, Timing & Scoring Engine)  
-
-This guide provides the exact steps, file imports, and copy-pasteable code blocks so **Laith** and **Esmaeel** can integrate Badr's Question Bank module (`QuestionsModule`, `DatabaseModule`, `GlobalHttpExceptionFilter`, `InternalToolGuard`, and `SeedQuestionsService`) into `main` without any conflicts.
+This guide covers two essential topics for merging into `main`:
+1. **How Laith, Esmaeel, Shiam, and Adham integrate with Badr's v3 Backend Platform, Global JWT Guard, and MongoDB Storage Contract (`02_API_CONTRACT.pdf` & `06_Badr_Tasks.pdf`)**.
+2. **Handoff Reference for Shiam Ezzo (`questions` & `interviews` modules)**: how the Question Bank transitioned from v2 to v3 (`ownerId`, `ownerUsername`, `PublicQuestion` vs `OwnerQuestion`, and `QUESTION_IN_USE` delete protection).
 
 ---
 
-## Part 1: Guide for Leader Laith Haj Hosin (Merging into `main` & Frontend Wiring)
+## Part 1: Integrating with Badr's v3 Platform on `main`
 
-### 1. Backend Dependencies Added in `backend/package.json`
-When merging `member-Badr` into `main`, ensure `backend/package.json` includes these 5 packages under `"dependencies"`:
+### 1.1 Single-Line Module Registration in `backend/src/app.module.ts` (Shiam & Esmaeel)
 
-```json
-{
-  "dependencies": {
-    "@nestjs/common": "^12.0.1",
-    "@nestjs/core": "^12.0.1",
-    "@nestjs/mongoose": "^12.0.0",
-    "@nestjs/platform-express": "^12.0.1",
-    "@nestjs/swagger": "^12.0.2",
-    "class-transformer": "^0.5.1",
-    "class-validator": "^0.15.1",
-    "mongoose": "^9.11.2",
-    "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.1"
-  }
-}
-```
-
-Then run inside `backend/`:
-```bash
-npm install
-```
-
----
-
-### 2. How `backend/src/app.module.ts` Should Look After Merging Both Badr & Esmaeel
-In `backend/src/app.module.ts`, register `DatabaseModule`, Badr's `QuestionsModule`, and Esmaeel's `SessionsModule` (and `HistoryModule` if separated):
+Badr owns `backend/src/app.module.ts`. Under the "nobody waits" rule (`00_README.pdf` & `06_Badr_Tasks.pdf` §6):
+- **Shiam** adds only `QuestionsModule` and `InterviewsModule` to the `imports` array in `backend/src/app.module.ts` when opening her PR.
+- **Esmaeel** adds only `AttemptsModule` to the `imports` array in `backend/src/app.module.ts` when opening his PR.
 
 ```ts
-import { Module } from '@nestjs/common';
-import { AppController } from './app.controller.js';
-import { AppService } from './app.service.js';
-import { DatabaseModule } from './database/database.module.js';
-import { QuestionsModule } from './questions/questions.module.js';
-// When Esmaeel merges his module, add:
-// import { SessionsModule } from './sessions/sessions.module.js';
-
+// backend/src/app.module.ts
 @Module({
   imports: [
-    DatabaseModule,
-    QuestionsModule,
-    // SessionsModule,
+    ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath: ['.env', 'backend/.env'],
+      validate: validateEnv,
+    }),
+    MongooseModule.forRootAsync({ ... }),
+    AuthModule,
+    UsersModule,
+    QuestionsModule,   // <-- Shiam adds this line in her PR
+    InterviewsModule,  // <-- Shiam adds this line in her PR
+    AttemptsModule,    // <-- Esmaeel adds this line in his PR
   ],
-  controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: JwtAuthGuard,
+    },
+  ],
 })
 export class AppModule {}
 ```
 
----
+### 1.2 Reading the Authenticated User in Controllers (Shiam & Esmaeel)
 
-### 3. How `backend/src/main.ts` Configures Prefix, Validation, Error Envelope & Swagger
-`backend/src/main.ts` is already configured to satisfy the entire `API-CONTRACT.md` for both Badr's and Esmaeel's routes:
-- Sets `app.enableCors()` so your Vite frontend can call `http://localhost:3000/api/v1`.
-- Sets `app.setGlobalPrefix('api/v1', { exclude: ['/'] })` so `@Controller('questions')` becomes `/api/v1/questions` and `@Controller('sessions')` becomes `/api/v1/sessions`.
-- Registers `ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true })` and converts validation errors into `{ statusCode: 400, code: 'VALIDATION_ERROR', message: '...', details: { errors: [...] } }`.
-- Registers `GlobalHttpExceptionFilter` so every thrown `AppHttpException` returns `{ statusCode, code, message, details? }` — matching your `isErrorEnvelope()` check in `frontend/src/api/client.ts` 1-for-1!
-- Mounts Swagger UI at `http://localhost:3000/api/docs` with the `x-internal-tool-key` security scheme.
-
----
-
-### 4. How Laith's Frontend (`SetupPage.tsx` & `api/questions.ts`) Connects to Badr's Backend
-We verified your `feature/laith-setup-interview` branch (`5435f2a`):
-1. **DTO Alignment:** Your `PublicQuestion` and `QuestionListResponse` in `frontend/src/types/api.ts` match `QuestionPublicDto` and `QuestionListResponseDto` **100%**.
-2. **Categories on `SetupPage.tsx`:** Your `SetupPage.tsx` calls `getQuestions()` (`GET /api/v1/questions`) on mount and extracts unique categories dynamically:
-   - The backend automatically seeds **78 questions** across 4 categories: `react`, `typescript`, `nodejs`, and `mongodb`.
-   - In `react` + `medium`, there are **7 active questions** (IDs `108–114`, including Sara's React key question from Section 5 of the spec). This allows starting a 6-question session while requesting 10 questions triggers `409 INSUFFICIENT_QUESTIONS` with `details: { availableCount: 7 }` for **Live Demo Acceptance Test #1**.
-
----
-
-## Part 2: Guide for Esmaeel Mahfoud (Connecting `SessionsModule` to `QuestionsModule`)
-
-### 1. Importing `QuestionsModule` into `SessionsModule`
-`QuestionsModule` exports `QuestionsService`. In `backend/src/sessions/sessions.module.ts`, import `QuestionsModule` so NestJS can inject `QuestionsService` into `SessionsService`:
+Because Badr registers `JwtAuthGuard` globally via `APP_GUARD`:
+- **Every endpoint in `questions`, `interviews`, and `attempts` is automatically protected by Bearer JWT authentication.**
+- **Zero imports from `src/auth/`**: Shiam and Esmaeel must **not** import anything from `backend/src/auth/`.
+- After `JwtAuthGuard` verifies the token, it attaches the frozen shape from Contract §1 onto the Express request object:
 
 ```ts
-import { Module } from '@nestjs/common';
-import { MongooseModule } from '@nestjs/mongoose';
-import { QuestionsModule } from '../questions/questions.module.js';
-import { SessionsController } from './sessions.controller.js';
-import { SessionsService } from './sessions.service.js';
-import { ScoringService } from './scoring.service.js';
-import { Session, SessionSchema } from './schemas/session.schema.js';
-
-@Module({
-  imports: [
-    QuestionsModule, // <-- Gives SessionsService access to QuestionsService
-    MongooseModule.forFeature([{ name: Session.name, schema: SessionSchema }]),
-  ],
-  controllers: [SessionsController],
-  providers: [SessionsService, ScoringService],
-  exports: [SessionsService],
-})
-export class SessionsModule {}
+request.user = { userId: number, username: string }
 ```
 
----
-
-### 2. Fetching Active Questions & Creating Session Snapshots (`POST /api/v1/sessions`)
-In `SessionsService`, inject `QuestionsService` and call `findActiveForSession(category, difficulty)`:
-- It uses the `{ active: 1, category: 1, difficulty: 1 }` compound index.
-- It normalizes `category` (`trim().toLowerCase()`) automatically.
-- It returns full internal `Question[]` objects **including** private grading fields (`choices[].isCorrect`, `expectedKeywords`, `requiredKeywordCount`, `expectedOutput`, `codeSnippet`) so you can snapshot them directly into the `Session` document!
+In any controller (`QuestionsController`, `InterviewsController`, `AttemptsController`), read `request.user.userId` directly via `@Req()`:
 
 ```ts
-import { HttpStatus, Injectable } from '@nestjs/common';
-import { AppHttpException } from '../common/exceptions/app-http.exception.js';
-import { QuestionsService } from '../questions/questions.service.js';
-import { toQuestionPublicDto } from '../questions/dto/question-filter.dto.js';
-
-@Injectable()
-export class SessionsService {
-  constructor(private readonly questionsService: QuestionsService) {}
-
-  async createSession(dto: CreateSessionDto) {
-    // 1. Fetch all active questions matching category & difficulty (includes grading keys)
-    const availableQuestions = await this.questionsService.findActiveForSession(
-      dto.category,
-      dto.difficulty,
-    );
-
-    // 2. Enforce Business Rule #3: Reject with 409 INSUFFICIENT_QUESTIONS + details.availableCount
-    if (availableQuestions.length < dto.questionCount) {
-      throw new AppHttpException(
-        HttpStatus.CONFLICT,
-        'INSUFFICIENT_QUESTIONS',
-        `Requested ${dto.questionCount} questions, but only ${availableQuestions.length} active matching questions are available.`,
-        { availableCount: availableQuestions.length },
-      );
-    }
-
-    // 3. Randomly shuffle and pick `dto.questionCount` distinct questions for the session snapshot
-    const shuffled = [...availableQuestions].sort(() => Math.random() - 0.5);
-    const snapshotQuestions = shuffled.slice(0, dto.questionCount);
-
-    // 4. Save snapshotQuestions inside your Session document in MongoDB...
-    // 5. When returning the active session to the candidate, redact grading fields:
-    const safeQuestions = snapshotQuestions.map((q) => toQuestionPublicDto(q));
-    return {
-      // ...session fields,
-      questions: safeQuestions,
-    };
-  }
+@Post()
+async create(
+  @Req() req: { user: { userId: number; username: string } },
+  @Body() dto: CreateQuestionDto,
+) {
+  return this.questionsService.create(req.user.userId, dto);
 }
 ```
 
----
+### 1.3 Testing Modules in Isolation by Overriding `APP_GUARD` (Shiam & Esmaeel)
 
-### 3. How `DELETE /api/v1/internal/questions/:id` Checks Your `sessions` Collection (`409 QUESTION_IN_USE`)
-To satisfy Business Rule #2 under Question Bank (*"A question that already appears in any session cannot be deleted — it can only be deactivated"*):
-- When `DELETE /api/v1/internal/questions/:id` is called, `QuestionsService.isQuestionUsedInAnySession(questionId)` automatically runs:
-  ```ts
-  this.connection.db.collection('sessions').countDocuments(
-    {
-      $or: [
-        { 'questions.id': questionId },
-        { 'questions.questionId': questionId },
-      ],
-    },
-    { limit: 1 },
-  );
-  ```
-- **What Esmaeel needs to ensure in `session.schema.ts`:**
-  1. Name the Mongoose collection `'sessions'` (`@Schema({ collection: 'sessions', timestamps: true })`).
-  2. Store the snapshotted questions in an array property named `questions` where each snapshotted question keeps its numeric `id` (or `questionId`).
-  3. *(Optional for in-memory unit tests)*: You can also call `this.questionsService.markQuestionUsedInSession(q.id)` when creating a session so even in-memory tests without MongoDB immediately enforce `409 QUESTION_IN_USE`!
+In isolated e2e tests (`questions.e2e-spec.ts`, `interviews.e2e-spec.ts`, `attempts.e2e-spec.ts`), Shiam and Esmaeel can either:
+1. Override `JwtAuthGuard` (or test their module standalone with a fake guard that sets `req.user = { userId: 1, username: 'alex_dev' }`), **or**
+2. Once merged with Badr's `AuthModule`, call `POST /api/v1/auth/register` to obtain a real `accessToken` and send `Authorization: Bearer <accessToken>`.
 
----
+### 1.4 Cross-Collection Native Driver Reads & Numeric IDs (Contract §8)
 
-### 4. Using `AppHttpException` for All Session Error Codes
-To keep every error across `Questions` and `Sessions` in the exact `{ statusCode, code, message, details? }` envelope required by `docs/API-CONTRACT.md`, import `AppHttpException` from `../common/exceptions/app-http.exception.js`:
+Modules never import each other's services or Mongoose models. Instead, each module injects `@InjectConnection() private readonly connection: Connection` and reads other collections via `this.connection.collection('<name>')`:
+
+| Module Owner | Writes To Collection(s) | Counter Key in `counters` | Reads From Other Collections via `connection.collection(...)` |
+| --- | --- | --- | --- |
+| **Badr** | `users` | `'users'` | Reads `questions` (`ownerId`), `interviews` (`ownerId`), `attempts` (`userId`, `status`, `percentage`, `answers`) for `GET /users/:id/profile` |
+| **Shiam** | `questions`, `interviews` | `'questions'`, `'interviews'` | Reads `users` (`{ id, username }`) to populate `ownerUsername`; reads `interviews` (`questionIds`) & `attempts` (`questions.questionId`) before `DELETE /questions/:id` |
+| **Esmaeel** | `attempts` | `'attempts'` | Reads `interviews` (`{ id, title, questionIds, timeLimitSeconds }`) and `questions` (full question docs) during `POST /attempts` to snapshot the interview |
+
+Each module implements its own private numeric ID helper on `counters` using its own `_id` key (`'users'`, `'questions'`, `'interviews'`, `'attempts'`):
 
 ```ts
-// 404 SESSION_NOT_FOUND
-throw new AppHttpException(HttpStatus.NOT_FOUND, 'SESSION_NOT_FOUND', `Session ${id} not found.`);
-
-// 409 SESSION_NOT_ACTIVE
-throw new AppHttpException(HttpStatus.CONFLICT, 'SESSION_NOT_ACTIVE', 'Session is no longer in progress.');
-
-// 409 SESSION_NOT_ENDED
-throw new AppHttpException(HttpStatus.CONFLICT, 'SESSION_NOT_ENDED', 'Results are not available until the session ends.');
-
-// 409 DUPLICATE_ANSWER
-throw new AppHttpException(HttpStatus.CONFLICT, 'DUPLICATE_ANSWER', 'An answer for this question has already been submitted.');
-
-// 409 QUESTION_NOT_IN_SESSION
-throw new AppHttpException(HttpStatus.CONFLICT, 'QUESTION_NOT_IN_SESSION', 'Question does not belong to this session.');
-
-// 400 ANSWER_TYPE_MISMATCH
-throw new AppHttpException(HttpStatus.BAD_REQUEST, 'ANSWER_TYPE_MISMATCH', 'Submitted answer type does not match question type.');
-
-// 400 INVALID_CHOICE
-throw new AppHttpException(HttpStatus.BAD_REQUEST, 'INVALID_CHOICE', 'Selected choiceId is not valid for this question.');
+const result = await this.connection
+  .collection<{ _id: string; seq: number }>('counters')
+  .findOneAndUpdate(
+    { _id: '<your_key>' },
+    { $inc: { seq: 1 } },
+    { upsert: true, returnDocument: 'after' },
+  );
 ```
+
+### 1.5 Frontend Auth & API Integration (Laith & Adham — Contract §9)
+
+1. **Base URL**: `import.meta.env.VITE_API_URL` (`http://localhost:3000/api/v1`).
+2. **LocalStorage Keys (Frozen)**:
+   - `preppressure.token`: raw JWT string (`accessToken` from `POST /auth/login` or `POST /auth/register`).
+   - `preppressure.user`: JSON-serialized `PrivateUser` (`{ id, username, email, displayName, bio, createdAt }`).
+3. **Automatic Logout on `401`**:
+   - Whenever any feature API call (`auth`, `profile`, `attempts`, `questions`, `interviews`) receives HTTP `401`, it must remove `preppressure.token` and `preppressure.user` from `localStorage` and dispatch:
+     ```ts
+     window.dispatchEvent(new Event('preppressure:logout'));
+     ```
+   - Laith's `AuthContext` listens for `'preppressure:logout'` and redirects the user to `/login`.
+
+---
+
+## Part 2: v2-to-v3 Question Bank Handoff Note for Shiam Ezzo (`07_Shiam_Tasks.pdf`)
+
+In v3, ownership of `backend/src/questions/**` and `backend/src/interviews/**` belongs to **Shiam Ezzo**. Below is the exact checklist of what changed between the v2 Question Bank and the v3 Question Bank specification so Shiam can implement `backend/src/questions/**` smoothly:
+
+1. **Ownership & Auth (`ownerId` & `ownerUsername`)**:
+   - In v2, question creation/modification used an `x-internal-tool-key` header. In v3, `x-internal-tool-key` is completely gone.
+   - `POST /api/v1/questions` sets `ownerId = req.user.userId` (from Badr's JWT guard, never from the request body).
+   - `PATCH /api/v1/questions/:id` and `DELETE /api/v1/questions/:id` check `question.ownerId === req.user.userId`. If not equal, throw `403 Forbidden` with `code: 'NOT_OWNER'`.
+   - Every response includes `ownerUsername: string | null`, looked up from Badr's `users` collection via `this.connection.collection('users').findOne({ id: question.ownerId })` (`null` if the user no longer exists).
+2. **Two Response Shapes (`PublicQuestion` vs. `OwnerQuestion`)**:
+   - **`PublicQuestion`** (returned to non-owners):
+     - Includes `id`, `ownerId`, `ownerUsername`, `prompt`, `category`, `difficulty`, `type`, `choices` (`[{ id, text }]` **without** `isCorrect` for `multiple_choice`, `null` for other types), `codeSnippet` (string for `code_output`, `null` for other types), `createdAt`, `updatedAt`.
+     - Never includes `choices[].isCorrect`, `expectedKeywords`, `requiredKeywordCount`, or `expectedOutput`.
+   - **`OwnerQuestion`** (returned on `POST /questions`, `PATCH /questions/:id`, and `GET /questions/:id` when `req.user.userId === question.ownerId`):
+     - Includes all `PublicQuestion` fields plus `choices[].isCorrect`, `expectedKeywords`, `requiredKeywordCount`, and `expectedOutput` (`null` when not relevant to the question's `type`).
+3. **Query Filters on `GET /api/v1/questions`**:
+   - Optional query params: `category`, `difficulty`, `type`, `ownerId` (positive integer), `search` (case-insensitive substring match on `prompt`).
+   - Unknown query fields are automatically rejected with `400` by Badr's global `ValidationPipe({ whitelist: true, forbidNonWhitelisted: true })`.
+4. **Cross-Collection Delete Protection (`409 QUESTION_IN_USE`)**:
+   - Before deleting a question in `DELETE /api/v1/questions/:id`, check via the native driver:
+     - `this.connection.collection('interviews').findOne({ questionIds: id })`
+     - `this.connection.collection('attempts').findOne({ 'questions.questionId': id })`
+   - If either exists, throw `409 Conflict` with `code: 'QUESTION_IN_USE'`.

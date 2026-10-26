@@ -1,0 +1,8 @@
+{
+  "name": "AceUp - PrepPressure",
+  "description": "Technical interview preparation platform with timed sessions, question bank, and scoring.",
+  "requestFeedback": false,
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

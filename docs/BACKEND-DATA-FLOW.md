@@ -1,169 +1,148 @@
-# PrepPressure — Backend Data Flow & Lifecycle Guide (Badr's Domain)
+# PrepPressure — Backend Data Flow Guide (v3: Platform, Auth, Users & Profile Stats)
 
-**Owner:** Badr Al Jerf  
-**Stack:** NestJS · Swagger (`@nestjs/swagger`) · Mongoose (`@nestjs/mongoose`) · MongoDB · `.env` · `class-validator` / `class-transformer` · Guards · DTOs  
-
-This document traces **how data moves through the backend** from server startup and incoming HTTP requests all the way to MongoDB storage, session snapshot selection, and redacted public responses.
+This document explains how every HTTP request flows through **Badr Al Jerf's** v3 backend foundation (`backend/src/main.ts`, `backend/src/app.module.ts`, `backend/src/config/env.validation.ts`, `backend/src/auth/**`, and `backend/src/users/**`) under the frozen `docs/API-CONTRACT.md` (v3).
 
 ---
 
-## 1. End-to-End Backend Data Flow Diagram
+## 1. End-to-End Request Pipeline Overview
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│ 1. SERVER BOOTSTRAP (backend/src/main.ts & DatabaseModule)                  │
-│   • Connects Mongoose to process.env.MONGODB_URI (bufferCommands = false)   │
-│   • Registers Global Prefix: /api/v1                                        │
-│   • Registers Global ValidationPipe (whitelist + forbidNonWhitelisted)      │
-│   • Registers GlobalHttpExceptionFilter ({ statusCode, code, message })     │
-│   • Mounts Swagger UI at /api/docs                                          │
-│   • SeedQuestionsService.onModuleInit() seeds 78 questions if DB is empty   │
-└───────────────────────────────────────┬─────────────────────────────────────┘
-                                        │
-                                        ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│ 2. INCOMING HTTP REQUEST                                                    │
-│   • Public Routes:   GET /api/v1/questions, GET /api/v1/questions/:id       │
-│   • Internal Routes: POST, PATCH /:id, PATCH /:id/deactivate, DELETE /:id   │
-│                      under /api/v1/internal/questions                       │
-└───────────────────┬─────────────────────────────────────┬───────────────────┘
-                    │ Public Request                      │ Internal Request
-                    │ (No Guard)                          ▼
-                    │                      ┌──────────────────────────────────┐
-                    │                      │ 3. GUARD LAYER                   │
-                    │                      │    (InternalToolGuard)           │
-                    │                      │ • Reads x-internal-tool-key      │
-                    │                      │ • Compares with process.env.     │
-                    │                      │   INTERNAL_TOOL_KEY              │
-                    │                      │ • Fails closed (401 UNAUTHORIZED)│
-                    │                      │   if unset, empty, or mismatched │
-                    │                      └──────────────┬───────────────────┘
-                    └───────────────────┬─────────────────┘
-                                        ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│ 4. DTO & VALIDATION PIPE LAYER                                              │
-│   • Query Filter: QuestionFilterDto (category?, difficulty?, type?)         │
-│   • Create Body:  CreateQuestionDto (prompt, category, difficulty, type...) │
-│   • Update Body:  UpdateQuestionDto (partial fields)                        │
-│   • Rejects unknown fields or invalid types with 400 VALIDATION_ERROR       │
-└───────────────────────────────────────┬─────────────────────────────────────┘
-                                        ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│ 5. CONTROLLER LAYER (QuestionsController & InternalQuestionsController)     │
-│   • Parses & validates numeric :id parameter (parseNumericQuestionId)       │
-│   • Routes validated DTOs to QuestionsService methods                       │
-└───────────────────────────────────────┬─────────────────────────────────────┘
-                                        ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│ 6. SERVICE & DOMAIN LOGIC LAYER (QuestionsService)                          │
-│   • validateQuestionShape(): Enforces cross-field & type-exclusivity rules  │
-│   • getNextQuestionId(): Finds max numeric `id` via sort({ id: -1 }) + 1    │
-│   • isQuestionUsedInAnySession(): Queries `sessions` collection before      │
-│     DELETE; throws 409 QUESTION_IN_USE if referenced                        │
-│   • toQuestionPublicDto(): Strips private grading fields before returning   │
-│     any public response                                                     │
-│   • findActiveForSession(): Supplies full internal questions to Esmaeel     │
-└───────────────────────────────────────┬─────────────────────────────────────┘
-                                        ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│ 7. MONGODB & MONGOOSE SCHEMA LAYER (QuestionSchema)                         │
-│   • Collection: `questions`                                                 │
-│   • Unique Index: `{ id: 1 }` (Fast numeric ID lookup & max-ID sorting)     │
-│   • Compound Index: `{ active: 1, category: 1, difficulty: 1 }`             │
-│     (Fast index scan for public filtering and session question selection)   │
-└─────────────────────────────────────────────────────────────────────────────┘
+```text
+Incoming HTTP Request (http://localhost:3000/api/v1/...)
+   │
+   ▼
+[1. Startup & App Bootstrap] (backend/src/main.ts + backend/src/config/env.validation.ts)
+   • Validates MONGODB_URI, JWT_SECRET, JWT_EXPIRES_IN, PORT, CORS_ORIGIN at startup
+   • Refuses to boot if MONGODB_URI or JWT_SECRET is missing
+   • Configures CORS from CORS_ORIGIN
+   • Sets global prefix '/api/v1'
+   • Mounts Swagger UI at '/docs' (outside '/api/v1') with Bearer auth & persistAuthorization: true
+   │
+   ▼
+[2. Global JWT Auth Guard] (backend/src/auth/jwt-auth.guard.ts — registered via APP_GUARD)
+   • Checks @Public() metadata via Reflector (only POST /auth/register & POST /auth/login)
+   • If not public: extracts 'Authorization: Bearer <token>'
+   • Verifies signature & expiration via JwtService.verifyAsync(token)
+   • Attaches frozen identity: request.user = { userId: payload.sub, username: payload.username }
+   • Missing/invalid/expired token -> throws 401 { code: 'UNAUTHORIZED' }
+   │
+   ▼
+[3. Global ValidationPipe] (backend/src/main.ts)
+   • Runs class-transformer (@Transform) to trim strings and lowercase username/email
+   • Runs class-validator rules on DTOs
+   • Rejects unknown body properties (whitelist: true, forbidNonWhitelisted: true) with 400
+   │
+   ▼
+[4. Controller Routing] (AuthController / UsersController)
+   • Dispatches validated DTO & authenticated request.user to AuthService / UsersService / ProfileStatsService
+   │
+   ▼
+[5. Service & MongoDB Storage Layer] (Contract §8)
+   • UsersService writes exclusively to 'users' collection and 'counters' key 'users'
+   • ProfileStatsService reads 'questions', 'interviews', and 'attempts' via native driver (connection.collection('<name>'))
+   • Serializes responses into PrivateUserDto / PublicUserDto / UserProfileResponseDto (never exposing passwordHash or _id)
 ```
 
 ---
 
-## 2. Detailed Step-by-Step Data Flows by Operation
+## 2. Detailed Flow by Endpoint
 
-### Flow A: Application Startup & Repeatable Seeding (`OnModuleInit`)
-1. NestJS initializes `DatabaseModule` and `QuestionsModule`.
-2. `SeedQuestionsService.onModuleInit()` runs automatically and calls `questionsService.seedInitialQuestions(SEED_QUESTIONS)`.
-3. **Validation Gate:** Every item in `SEED_QUESTIONS` (78 hand-authored questions across `react`, `typescript`, `nodejs`, `mongodb`) is passed through `validateQuestionShape()` to verify that all seeded data satisfies the contract rules.
-4. **Idempotency Check:** `questionModel.countDocuments()` checks if the `questions` collection in MongoDB is empty:
-   - **If `count === 0` (First start):** Inserts all 78 questions (`id: 101` through `178`) into MongoDB via `insertMany()`.
-   - **If `count > 0` (Subsequent restarts):** Skips seeding so existing database records, edits, and deactivations survive backend restarts without duplication.
+### Flow A: `POST /api/v1/auth/register` (Public)
 
----
-
-### Flow B: Public Question Browsing (`GET /api/v1/questions`)
-1. **Incoming Request:** Candidate or frontend calls `GET /api/v1/questions?category=react&difficulty=medium`.
-2. **DTO Validation (`QuestionFilterDto`):**
-   - `ValidationPipe` transforms and trims `category` (`"react"`), verifies `difficulty` is in `['easy', 'medium', 'hard']`, and verifies `type` (if present) is in `['multiple_choice', 'short_answer', 'code_output']`.
-   - If the client sends an unknown query param (e.g., `?hack=1`) or invalid enum (`?difficulty=extreme`), `ValidationPipe` immediately throws `400 VALIDATION_ERROR`.
-3. **Database Query (`QuestionsService.findAllPublic`):**
-   - Builds a MongoDB query filter: `{ active: true, category: 'react', difficulty: 'medium' }`.
-   - MongoDB uses the compound index `{ active: 1, category: 1, difficulty: 1 }` to locate matching active documents in $O(\log N)$ time and sorts them by `{ id: 1 }`.
-4. **Redaction (`toQuestionPublicDto`):**
-   - Each database document is mapped into a fresh `QuestionPublicDto` object containing **only**:
-     - `id`, `prompt`, `category`, `difficulty`, `type`
-     - `choices: [{ id, text }]` (for `multiple_choice` — `isCorrect` is stripped!)
-     - `codeSnippet` (for `code_output` — `expectedOutput` is stripped!)
-     - For `short_answer`, `expectedKeywords` and `requiredKeywordCount` are completely omitted.
-5. **Outgoing Response:** Returns `200 OK` with `{ items: QuestionPublicDto[] }`.
-
----
-
-### Flow C: Public Single Question Lookup (`GET /api/v1/questions/:id`)
-1. **Incoming Request:** Client requests `GET /api/v1/questions/109`.
-2. **ID Parsing (`parseNumericQuestionId`):** Verifies `:id` is a positive integer; otherwise throws `404 QUESTION_NOT_FOUND`.
-3. **Database Lookup:** Queries `questionModel.findOne({ id: 109 }).lean().exec()` using the unique `{ id: 1 }` index.
-   - If no document matches, throws `404 QUESTION_NOT_FOUND`.
-4. **Redaction & Response:** Passes the document through `toQuestionPublicDto()` and returns `200 OK`.
-
----
-
-### Flow D: Guarded Question Creation (`POST /api/v1/internal/questions`)
-1. **Incoming Request:** Operator or Swagger UI sends `POST /api/v1/internal/questions` with header `x-internal-tool-key` and JSON body.
-2. **Guard Check (`InternalToolGuard.canActivate`):**
-   - Reads `process.env.INTERNAL_TOOL_KEY`. If unset or empty, fails closed with `401 UNAUTHORIZED`.
-   - Compares `request.headers['x-internal-tool-key']` against `process.env.INTERNAL_TOOL_KEY`. If missing or unequal, throws `401 UNAUTHORIZED`.
-3. **Pipe & Cross-Field Validation (`CreateQuestionDto` + `validateQuestionShape`):**
-   - `ValidationPipe` validates field types and rejects any unknown JSON properties.
-   - `validateQuestionShape()` enforces type-specific rules:
-     - **`multiple_choice`**: Must have 2–6 choices, unique `id`s, non-empty `text`, and **exactly one** `isCorrect: true`. Must not include `expectedKeywords`, `requiredKeywordCount`, `expectedOutput`, or `codeSnippet`.
-     - **`short_answer`**: Must have 2–6 unique non-empty `expectedKeywords` and an integer `requiredKeywordCount` between `1` and `expectedKeywords.length`. Must not include `choices`, `expectedOutput`, or `codeSnippet`.
-     - **`code_output`**: Must have a non-empty `expectedOutput` (`<= 1000` chars) and optional `codeSnippet`. Must not include `choices`, `expectedKeywords`, or `requiredKeywordCount`.
-4. **Direct Numeric ID Assignment (`getNextQuestionId`):**
-   - Queries `questionModel.findOne().sort({ id: -1 }).select({ id: 1 }).lean().exec()` and adds `1` (e.g., `178 + 1 = 179`).
-5. **Persistence & Logging:**
-   - Saves the document to MongoDB, logs `Question created: id=179 ...` via NestJS `Logger`, and returns `201 Created`.
-
----
-
-### Flow E: Guarded Question Update (`PATCH /api/v1/internal/questions/:id`)
-1. **Guard & ID Lookup:** Verified by `InternalToolGuard`. Loads existing question by numeric `id` (`404 QUESTION_NOT_FOUND` if missing).
-2. **Holistic Merge & Validation:**
-   - Merges the partial `UpdateQuestionDto` fields onto the existing question document.
-   - Runs `validateQuestionShape(mergedCandidate)` on the **complete resulting shape** so a partial update can never leave a question in an inconsistent state (e.g., reducing `expectedKeywords` below `requiredKeywordCount` or mixing `choices` onto a `short_answer` question).
-3. **Database Update & Snapshot Isolation:**
-   - Updates the document in the `questions` collection (`$set` updated fields, `$unset` fields irrelevant to the target type).
-   - **Historical Session Safety:** Because active and finished sessions store their own embedded copy of questions in the `sessions` collection, editing a question in `questions` never alters past sessions.
-
----
-
-### Flow F: Guarded Deactivation vs. Deletion (`PATCH /:id/deactivate` & `DELETE /:id`)
-1. **Soft Deactivation (`PATCH /api/v1/internal/questions/:id/deactivate`):**
-   - Sets `active: false` on the question in MongoDB.
-   - The deactivated question immediately stops appearing in `GET /api/v1/questions` and `findActiveForSession()`, while remaining intact in database history.
-2. **Hard Deletion (`DELETE /api/v1/internal/questions/:id`):**
-   - Calls `isQuestionUsedInAnySession(id)`, which queries MongoDB's `sessions` collection:
+1. **Guard Bypass**: `AuthController.register` is decorated with `@Public()`. `JwtAuthGuard` inspects `IS_PUBLIC_KEY` via `Reflector` and immediately returns `true`.
+2. **DTO Normalization & Validation (`RegisterDto`)**:
+   - `username`: trimmed, lowercased, 3–30 chars, matches `/^[a-z0-9_]+$/`.
+   - `email`: trimmed, lowercased, validated with `@IsEmail()`.
+   - `password`: 8–72 chars.
+   - `displayName`: trimmed, 2–50 chars.
+3. **Password Hashing (`AuthService.register`)**:
+   - Hashes plaintext `dto.password` using `bcrypt.hash(dto.password, 10)` (10 salt rounds).
+4. **Uniqueness Check & Numeric ID Assignment (`UsersService.createUser`)**:
+   - Checks if `username` already exists in `users` → if so, throws `409 Conflict` with `code: 'USERNAME_TAKEN'`.
+   - Checks if `email` already exists in `users` → if so, throws `409 Conflict` with `code: 'EMAIL_TAKEN'`.
+   - Atomically increments the `users` sequence counter in the `counters` collection:
      ```ts
-     this.connection.db.collection('sessions').countDocuments(
-       { $or: [{ 'questions.id': questionId }, { 'questions.questionId': questionId }] },
-       { limit: 1 }
-     )
+     connection.collection('counters').findOneAndUpdate(
+       { _id: 'users' },
+       { $inc: { seq: 1 } },
+       { upsert: true, returnDocument: 'after' },
+     );
      ```
-   - **If `count > 0` (Used in any session):** Rejects deletion with `409 QUESTION_IN_USE` and instructs the operator to use `PATCH /api/v1/internal/questions/:id/deactivate` instead.
-   - **If `count === 0` (Never used):** Deletes the document from `questions` and returns `{ deleted: true, id }`.
+   - Inserts the new user document into `users` with `bio: null` and `passwordHash` (`select: false`).
+5. **JWT Issuance**:
+   - `AuthService` signs `{ sub: user.id, username: user.username }` using `JWT_SECRET` and `JWT_EXPIRES_IN` (default `1h` = `3600` seconds).
+   - Returns `201 Created` with `{ accessToken, tokenType: 'Bearer', expiresIn: 3600, user: PrivateUser }`.
 
 ---
 
-### Flow G: Session Question Selection Boundary (`findActiveForSession`)
-When Esmaeel's `SessionsService` handles `POST /api/v1/sessions`:
-1. `SessionsService` calls `await this.questionsService.findActiveForSession(category, difficulty)`.
-2. `QuestionsService` queries `{ active: true, category: category.trim().toLowerCase(), difficulty }` using the `{ active: 1, category: 1, difficulty: 1 }` compound index.
-3. Returns the full internal `Question[]` array **including** `choices[].isCorrect`, `expectedKeywords`, `requiredKeywordCount`, and `expectedOutput`.
-4. If `matching.length < questionCount`, `SessionsService` throws `409 INSUFFICIENT_QUESTIONS` with `details: { availableCount: matching.length }`. Otherwise, `SessionsService` picks `questionCount` random distinct questions and embeds them into the new `Session` document.
+### Flow B: `POST /api/v1/auth/login` (Public)
+
+1. **Guard Bypass**: Decorated with `@Public()`.
+2. **DTO Validation (`LoginDto`)**: Validates non-empty `usernameOrEmail` and `password`.
+3. **Lookup with Explicit `+passwordHash` Selection**:
+   - Because `passwordHash` has `select: false` in `UserSchema`, `UsersService.findByUsernameOrEmailWithPassword` explicitly runs `.select('+passwordHash')` against `{ $or: [{ username: normalized }, { email: normalized }] }`.
+4. **Anti-Enumeration Verification (`AuthService.login`)**:
+   - Whether the user does not exist **or** `bcrypt.compare(dto.password, user.passwordHash)` returns `false`, `AuthService` throws the **exact same** `401 Unauthorized` response:
+     ```json
+     {
+       "statusCode": 401,
+       "error": "Unauthorized",
+       "code": "INVALID_CREDENTIALS",
+       "message": "Invalid username/email or password."
+     }
+     ```
+   - This prevents attackers from enumerating valid usernames or emails.
+5. **JWT Issuance**: Signs `{ sub: user.id, username: user.username }` and returns `200 OK` with `AuthResponseDto`.
+
+---
+
+### Flow C: `GET /api/v1/auth/me` (Protected)
+
+1. **JWT Verification (`JwtAuthGuard`)**:
+   - Extracts Bearer token, verifies signature and expiration, and sets `request.user = { userId: payload.sub, username: payload.username }`.
+2. **User Lookup (`AuthService.getMe`)**:
+   - Queries `UsersService.findPrivateById(req.user.userId)`.
+   - If the user was deleted after the token was issued, throws `401 UNAUTHORIZED`.
+   - Returns `200 OK` with `PrivateUserDto` (`{ id, username, email, displayName, bio, createdAt }`).
+
+---
+
+### Flow D: `PATCH /api/v1/users/me` (Protected)
+
+1. **JWT Verification**: Populates `req.user.userId`.
+2. **DTO Validation (`UpdateMeDto`)**:
+   - `displayName` (optional): trimmed string, 2–50 chars.
+   - `bio` (optional): trimmed string up to 300 chars, or `null` to clear the bio.
+   - Any extra field (such as `email`, `username`, or `id`) is rejected with `400 Bad Request` by `forbidNonWhitelisted: true`.
+3. **Atomic Update (`UsersService.updateMe`)**:
+   - Updates `{ id: req.user.userId }` in `users` via `findOneAndUpdate({ id: userId }, { $set: updates }, { new: true })`.
+   - Returns `200 OK` with the updated `PrivateUserDto`.
+
+---
+
+### Flow E: `GET /api/v1/users/:id/profile` (Protected)
+
+1. **JWT Verification**: Requires a valid Bearer token (`401 UNAUTHORIZED` otherwise).
+2. **Parameter Validation**: Ensures `:id` is a positive integer (`400 VALIDATION_FAILED` otherwise).
+3. **Parallel User + Cross-Collection Stats Read**:
+   - `UsersService.findPublicByIdOrThrow(id)` fetches the user and maps to `PublicUserDto` (**omitting both `email` and `passwordHash`**), or throws `404 NOT_FOUND`.
+   - `ProfileStatsService.getStatsForUser(id)` reads across collections using the native MongoDB driver (`connection.collection('<name>')`) and Contract §8 fields only (no Mongoose `populate`, no `aggregate` pipelines):
+     - `questions`: `countDocuments({ ownerId: userId })` → `questionsCreated`
+     - `interviews`: `countDocuments({ ownerId: userId })` → `interviewsCreated`
+     - `attempts`: `find({ userId }, { projection: { status: 1, percentage: 1, answers: 1, _id: 0 } }).toArray()`
+       - Counts `status === 'in_progress'` → `attemptsInProgress`
+       - Counts `status === 'finished' || status === 'timed_out'` → `attemptsCompleted`
+       - Sums `answers.length` across all user attempts → `questionsAnswered`
+       - Computes `averagePercentage` and `bestPercentage` (rounded to 1 decimal place) across completed attempts, or returns `null` if the user has 0 completed attempts.
+
+---
+
+## 3. Discussion Answers ("Things to Think About" in `06_Badr_Tasks.pdf`)
+
+1. **How will the guard know a route is public without other modules importing anything?**
+   - Only `POST /auth/register` and `POST /auth/login` in the entire application are public, and both live inside Badr's `AuthController`. Therefore `@Public()` (`SetMetadata('isPublic', true)`) is only imported inside `auth.controller.ts` and read by `JwtAuthGuard` via NestJS's `Reflector`. Other backend modules (`questions`, `interviews`, `attempts`) never need to import `@Public()` or `JwtAuthGuard`.
+2. **Login must not reveal whether the username exists. Why does that matter?**
+   - Returning different status codes or error messages for "user not found" vs. "wrong password" enables **account enumeration attacks**, allowing attackers to harvest valid usernames/emails for targeted brute-force or phishing attacks. Both cases return `401 INVALID_CREDENTIALS` with the identical message `"Invalid username/email or password."`.
+3. **`averagePercentage` without aggregation: what is the minimum data you need to read from `attempts`?**
+   - Using `.find({ userId }, { projection: { status: 1, percentage: 1, answers: 1, _id: 0 } })`, we only read `status`, `percentage`, and `answers` (skipping the heavy `questions` snapshot array). From those three fields we compute `attemptsCompleted`, `attemptsInProgress`, `questionsAnswered`, `averagePercentage`, and `bestPercentage` in a single pass in memory.
+4. **What should happen to the token if a user is deleted?**
+   - Because JWTs are stateless, a signed token remains cryptographically valid until its `exp` timestamp (`JWT_EXPIRES_IN`). However, `GET /auth/me` and `PATCH /users/me` verify that the user record still exists in `users` (returning `401 UNAUTHORIZED` / `404 NOT_FOUND` if deleted). If immediate revocation across all endpoints were required in production, we could either check user existence in `JwtAuthGuard` or maintain a short-TTL token revocation list / `tokenVersion` counter on the user document.
