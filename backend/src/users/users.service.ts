@@ -1,49 +1,98 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { InMemoryStore, type UserRecord } from '../common/store.service.js';
-
-export interface UpdateProfileInput {
-  displayName?: string;
-  bio?: string | null;
-}
+import { Injectable, NotFoundException, Inject } from '@nestjs/common';
+import { DatabaseService } from '../database/database.service.js';
+import { UpdateUserDto } from './dto/update-user.dto.js';
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly store: InMemoryStore) {}
+  constructor(@Inject(DatabaseService) private db: DatabaseService) {}
 
-  private sanitizeUser(user: UserRecord) {
+  async updateMe(userId: number, dto: UpdateUserDto) {
+    const user = this.db.users.find(u => u.id === userId);
+    if (!user) {
+      throw new NotFoundException({
+        statusCode: 404,
+        error: 'Not Found',
+        code: 'NOT_FOUND',
+        message: 'User not found',
+      });
+    }
+
+    if (dto.displayName !== undefined) {
+      user.displayName = dto.displayName.trim();
+    }
+
+    if (dto.bio !== undefined) {
+      user.bio = dto.bio ? dto.bio.trim() : null;
+    }
+
+    user.updatedAt = new Date().toISOString();
+    this.db.saveToDisk();
+
     return {
       id: user.id,
       username: user.username,
+      email: user.email,
       displayName: user.displayName,
       bio: user.bio,
+      role: user.role,
       createdAt: user.createdAt,
     };
   }
 
-  getPublicProfile(userId: number) {
-    const user = this.store.getUserById(userId);
+  async getProfile(targetId: number) {
+    const user = this.db.users.find(u => u.id === targetId);
     if (!user) {
-      throw new NotFoundException({ code: 'NOT_FOUND', message: 'User not found.' });
+      throw new NotFoundException({
+        statusCode: 404,
+        error: 'Not Found',
+        code: 'NOT_FOUND',
+        message: 'User not found',
+      });
     }
 
-    const questionsCreated = this.store.questions.filter((question) => question.ownerId === userId).length;
-    const interviewsCreated = this.store.interviews.filter((interview) => interview.ownerId === userId).length;
-    const attemptsCompleted = this.store.attempts.filter(
-      (attempt) => attempt.userId === userId && (attempt.status === 'finished' || attempt.status === 'timed_out'),
-    ).length;
-    const attemptsInProgress = this.store.attempts.filter(
-      (attempt) => attempt.userId === userId && attempt.status === 'in_progress',
-    ).length;
-    const endedAttempts = this.store.attempts.filter(
-      (attempt) => attempt.userId === userId && (attempt.status === 'finished' || attempt.status === 'timed_out'),
-    );
-    const questionsAnswered = endedAttempts.reduce((total, attempt) => total + Object.keys(attempt.answers).length, 0);
-    const percentages = endedAttempts.map((attempt) => attempt.percentage ?? 0).filter((value) => value !== null);
-    const averagePercentage = percentages.length ? Number((percentages.reduce((sum, value) => sum + value, 0) / percentages.length).toFixed(1)) : null;
-    const bestPercentage = percentages.length ? Math.max(...percentages) : null;
+    // Profile statistics matching Section 7:
+    // questionsCreated, interviewsCreated, attemptsCompleted, attemptsInProgress, questionsAnswered, averagePercentage, bestPercentage
+    const questionsCreated = this.db.questions.filter(q => q.ownerId === targetId).length;
+    const interviewsCreated = this.db.interviews.filter(i => i.ownerId === targetId).length;
+
+    const userAttempts = this.db.attempts.filter(a => a.userId === targetId);
+    const now = Date.now();
+
+    // Check lazy timeouts (+5s grace)
+    userAttempts.forEach(a => {
+      if (a.status === 'in_progress' && now > new Date(a.deadlineAt).getTime() + 5000) {
+        a.status = 'timed_out';
+        a.finishedAt = a.deadlineAt;
+      }
+    });
+
+    const endedAttempts = userAttempts.filter(a => a.status === 'finished' || a.status === 'timed_out');
+    const attemptsCompleted = endedAttempts.length;
+    const attemptsInProgress = userAttempts.filter(a => a.status === 'in_progress').length;
+
+    let questionsAnswered = 0;
+    endedAttempts.forEach(a => {
+      questionsAnswered += (a.answers || []).length;
+    });
+
+    let averagePercentage: number | null = null;
+    let bestPercentage: number | null = null;
+
+    if (endedAttempts.length > 0) {
+      const percentages = endedAttempts.map(a => a.percentage ?? 0);
+      const sum = percentages.reduce((acc, val) => acc + val, 0);
+      averagePercentage = Math.round((sum / percentages.length) * 10) / 10;
+      bestPercentage = Math.round(Math.max(...percentages) * 10) / 10;
+    }
 
     return {
-      user: this.sanitizeUser(user),
+      user: {
+        id: user.id,
+        username: user.username,
+        displayName: user.displayName,
+        bio: user.bio,
+        createdAt: user.createdAt,
+      },
       stats: {
         questionsCreated,
         interviewsCreated,
@@ -53,36 +102,6 @@ export class UsersService {
         averagePercentage,
         bestPercentage,
       },
-    };
-  }
-
-  updateCurrentUser(userId: number, input: UpdateProfileInput) {
-    const user = this.store.getUserById(userId);
-    if (!user) {
-      throw new NotFoundException({ code: 'NOT_FOUND', message: 'User not found.' });
-    }
-
-    const displayName = input.displayName !== undefined ? input.displayName.trim() : user.displayName;
-    if (displayName.length < 2 || displayName.length > 50) {
-      throw new BadRequestException({ code: 'VALIDATION_FAILED', message: 'Display name must be 2-50 characters.' });
-    }
-
-    const bio = input.bio === undefined ? user.bio : input.bio === null ? null : input.bio.slice(0, 300);
-    if (typeof bio === 'string' && bio.length > 300) {
-      throw new BadRequestException({ code: 'VALIDATION_FAILED', message: 'Bio must be 300 characters or fewer.' });
-    }
-
-    user.displayName = displayName;
-    user.bio = bio;
-    user.updatedAt = new Date().toISOString();
-
-    return {
-      id: user.id,
-      username: user.username,
-      email: user.email,
-      displayName: user.displayName,
-      bio: user.bio,
-      createdAt: user.createdAt,
     };
   }
 }

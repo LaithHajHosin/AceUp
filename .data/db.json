@@ -1,0 +1,1534 @@
+{
+  "users": [
+    {
+      "id": 1,
+      "username": "alex_dev",
+      "email": "alex@example.com",
+      "passwordHash": "c1e381c63a9aca9cb6fcedf38f6591b11b68f22c9b54b25eff04fa44617d439e",
+      "salt": "b12c59d74a11f234",
+      "displayName": "Alex Rivera",
+      "bio": "Lead Full-Stack Engineer & Technical Interviewer",
+      "role": "author",
+      "createdAt": "2026-10-25T08:04:50.216Z",
+      "updatedAt": "2026-10-25T08:04:50.216Z"
+    },
+    {
+      "id": 2,
+      "username": "sara_candidate",
+      "email": "sara@example.com",
+      "passwordHash": "c1e381c63a9aca9cb6fcedf38f6591b11b68f22c9b54b25eff04fa44617d439e",
+      "salt": "b12c59d74a11f234",
+      "displayName": "Sara Chen",
+      "bio": "Junior Software Engineer preparing for senior frontend rounds",
+      "role": "user",
+      "createdAt": "2026-10-25T08:04:50.216Z",
+      "updatedAt": "2026-10-25T08:04:50.216Z"
+    },
+    {
+      "id": 3,
+      "username": "admin",
+      "email": "admin@preppressure.internal",
+      "passwordHash": "c1e381c63a9aca9cb6fcedf38f6591b11b68f22c9b54b25eff04fa44617d439e",
+      "salt": "b12c59d74a11f234",
+      "displayName": "System Administrator",
+      "bio": "Platform administrator with full RBAC supervision privileges",
+      "role": "admin",
+      "createdAt": "2026-10-25T08:04:50.216Z",
+      "updatedAt": "2026-10-25T08:04:50.216Z"
+    }
+  ],
+  "questions": [
+    {
+      "id": 101,
+      "ownerId": 1,
+      "ownerUsername": "alex_dev",
+      "prompt": "Why does React require a unique `key` prop when rendering a dynamic list of items?",
+      "category": "react",
+      "difficulty": "easy",
+      "type": "short_answer",
+      "choices": null,
+      "codeSnippet": null,
+      "expectedOutput": null,
+      "expectedKeywords": [
+        "identity",
+        "reorder",
+        "re-render",
+        "diffing",
+        "virtual dom"
+      ],
+      "requiredKeywordCount": 2,
+      "createdAt": "2026-10-25T08:04:50.216Z",
+      "updatedAt": "2026-10-25T08:04:50.216Z"
+    },
+    {
+      "id": 102,
+      "ownerId": 1,
+      "ownerUsername": "alex_dev",
+      "prompt": "Which React hook should be preferred to preserve a mutable value across renders without causing a re-render?",
+      "category": "react",
+      "difficulty": "easy",
+      "type": "multiple_choice",
+      "choices": [
+        {
+          "id": "a",
+          "text": "useState",
+          "isCorrect": false
+        },
+        {
+          "id": "b",
+          "text": "useRef",
+          "isCorrect": true
+        },
+        {
+          "id": "c",
+          "text": "useMemo",
+          "isCorrect": false
+        },
+        {
+          "id": "d",
+          "text": "useCallback",
+          "isCorrect": false
+        }
+      ],
+      "codeSnippet": null,
+      "expectedOutput": null,
+      "expectedKeywords": null,
+      "requiredKeywordCount": null,
+      "createdAt": "2026-10-25T08:04:50.216Z",
+      "updatedAt": "2026-10-25T08:04:50.216Z"
+    },
+    {
+      "id": 103,
+      "ownerId": 1,
+      "ownerUsername": "alex_dev",
+      "prompt": "What will be printed to the console when clicking the button once?",
+      "category": "react",
+      "difficulty": "medium",
+      "type": "code_output",
+      "choices": null,
+      "codeSnippet": "function Counter() {\n  const [count, setCount] = useState(0);\n  const handleClick = () => {\n    setCount(count + 1);\n    setCount(count + 1);\n    console.log(count);\n  };\n  return <button onClick={handleClick}>Click</button>;\n}",
+      "expectedOutput": "0",
+      "expectedKeywords": null,
+      "requiredKeywordCount": null,
+      "createdAt": "2026-10-25T08:04:50.216Z",
+      "updatedAt": "2026-10-25T08:04:50.216Z"
+    },
+    {
+      "id": 104,
+      "ownerId": 1,
+      "ownerUsername": "alex_dev",
+      "prompt": "What is the primary difference between `useEffect` and `useLayoutEffect` in React?",
+      "category": "react",
+      "difficulty": "medium",
+      "type": "multiple_choice",
+      "choices": [
+        {
+          "id": "a",
+          "text": "useLayoutEffect runs asynchronously after paint, while useEffect runs synchronously",
+          "isCorrect": false
+        },
+        {
+          "id": "b",
+          "text": "useLayoutEffect fires synchronously immediately after DOM mutations before browser paint",
+          "isCorrect": true
+        },
+        {
+          "id": "c",
+          "text": "useLayoutEffect can only be executed in server components",
+          "isCorrect": false
+        },
+        {
+          "id": "d",
+          "text": "useEffect cannot accept a dependency array",
+          "isCorrect": false
+        }
+      ],
+      "codeSnippet": null,
+      "expectedOutput": null,
+      "expectedKeywords": null,
+      "requiredKeywordCount": null,
+      "createdAt": "2026-10-25T08:04:50.216Z",
+      "updatedAt": "2026-10-25T08:04:50.216Z"
+    },
+    {
+      "id": 105,
+      "ownerId": 1,
+      "ownerUsername": "alex_dev",
+      "prompt": "Explain what React reconciliation is and how the Virtual DOM algorithm determines when to update the real DOM.",
+      "category": "react",
+      "difficulty": "medium",
+      "type": "short_answer",
+      "choices": null,
+      "codeSnippet": null,
+      "expectedOutput": null,
+      "expectedKeywords": [
+        "diffing",
+        "tree",
+        "vdom",
+        "props",
+        "state",
+        "batch"
+      ],
+      "requiredKeywordCount": 2,
+      "createdAt": "2026-10-25T08:04:50.216Z",
+      "updatedAt": "2026-10-25T08:04:50.216Z"
+    },
+    {
+      "id": 106,
+      "ownerId": 1,
+      "ownerUsername": "alex_dev",
+      "prompt": "What is the purpose of React 18 `useTransition` hook?",
+      "category": "react",
+      "difficulty": "hard",
+      "type": "multiple_choice",
+      "choices": [
+        {
+          "id": "a",
+          "text": "To animate CSS transitions automatically on component mount",
+          "isCorrect": false
+        },
+        {
+          "id": "b",
+          "text": "To mark state updates as non-urgent transitions so urgent user input is not blocked",
+          "isCorrect": true
+        },
+        {
+          "id": "c",
+          "text": "To transition between client-side routes without React Router",
+          "isCorrect": false
+        },
+        {
+          "id": "d",
+          "text": "To transform synchronous functions into asynchronous web workers",
+          "isCorrect": false
+        }
+      ],
+      "codeSnippet": null,
+      "expectedOutput": null,
+      "expectedKeywords": null,
+      "requiredKeywordCount": null,
+      "createdAt": "2026-10-25T08:04:50.216Z",
+      "updatedAt": "2026-10-25T08:04:50.216Z"
+    },
+    {
+      "id": 107,
+      "ownerId": 1,
+      "ownerUsername": "alex_dev",
+      "prompt": "What does this JavaScript / React snippet output after evaluation?",
+      "category": "react",
+      "difficulty": "medium",
+      "type": "code_output",
+      "choices": null,
+      "codeSnippet": "const state = [1, 2, 3];\nconst next = [...state, 4];\nconsole.log(state === next, next.length);",
+      "expectedOutput": "false 4",
+      "expectedKeywords": null,
+      "requiredKeywordCount": null,
+      "createdAt": "2026-10-25T08:04:50.216Z",
+      "updatedAt": "2026-10-25T08:04:50.216Z"
+    },
+    {
+      "id": 108,
+      "ownerId": 1,
+      "ownerUsername": "alex_dev",
+      "prompt": "Explain how `useCallback` optimizes child component performance when used in conjunction with `React.memo`.",
+      "category": "react",
+      "difficulty": "hard",
+      "type": "short_answer",
+      "choices": null,
+      "codeSnippet": null,
+      "expectedOutput": null,
+      "expectedKeywords": [
+        "reference",
+        "equality",
+        "re-render",
+        "memo",
+        "props",
+        "shallow"
+      ],
+      "requiredKeywordCount": 2,
+      "createdAt": "2026-10-25T08:04:50.216Z",
+      "updatedAt": "2026-10-25T08:04:50.216Z"
+    },
+    {
+      "id": 109,
+      "ownerId": 1,
+      "ownerUsername": "alex_dev",
+      "prompt": "What is the key difference between the TypeScript `any` and `unknown` types?",
+      "category": "typescript",
+      "difficulty": "easy",
+      "type": "multiple_choice",
+      "choices": [
+        {
+          "id": "a",
+          "text": "unknown permits any property access without type narrowing, any requires checks",
+          "isCorrect": false
+        },
+        {
+          "id": "b",
+          "text": "unknown is type-safe: you must perform type checking or narrowing before using it",
+          "isCorrect": true
+        },
+        {
+          "id": "c",
+          "text": "any can only be assigned to void, whereas unknown cannot",
+          "isCorrect": false
+        },
+        {
+          "id": "d",
+          "text": "They are completely interchangeable aliases with no compiler differences",
+          "isCorrect": false
+        }
+      ],
+      "codeSnippet": null,
+      "expectedOutput": null,
+      "expectedKeywords": null,
+      "requiredKeywordCount": null,
+      "createdAt": "2026-10-25T08:04:50.216Z",
+      "updatedAt": "2026-10-25T08:04:50.216Z"
+    },
+    {
+      "id": 110,
+      "ownerId": 1,
+      "ownerUsername": "alex_dev",
+      "prompt": "What will this TypeScript code output when executed?",
+      "category": "typescript",
+      "difficulty": "medium",
+      "type": "code_output",
+      "choices": null,
+      "codeSnippet": "type UserRole = 'admin' | 'user';\nconst roles: Record<UserRole, number> = { admin: 10, user: 1 };\nconst keys = Object.keys(roles).sort();\nconsole.log(keys.join('-'));",
+      "expectedOutput": "admin-user",
+      "expectedKeywords": null,
+      "requiredKeywordCount": null,
+      "createdAt": "2026-10-25T08:04:50.216Z",
+      "updatedAt": "2026-10-25T08:04:50.216Z"
+    },
+    {
+      "id": 111,
+      "ownerId": 1,
+      "ownerUsername": "alex_dev",
+      "prompt": "Explain how TypeScript Discriminated Unions work and what makes a property a valid discriminant.",
+      "category": "typescript",
+      "difficulty": "medium",
+      "type": "short_answer",
+      "choices": null,
+      "codeSnippet": null,
+      "expectedOutput": null,
+      "expectedKeywords": [
+        "literal",
+        "narrow",
+        "tag",
+        "common",
+        "switch",
+        "exhaustive"
+      ],
+      "requiredKeywordCount": 2,
+      "createdAt": "2026-10-25T08:04:50.216Z",
+      "updatedAt": "2026-10-25T08:04:50.216Z"
+    },
+    {
+      "id": 112,
+      "ownerId": 1,
+      "ownerUsername": "alex_dev",
+      "prompt": "Which TypeScript utility type constructs a type with all properties of Type set to optional?",
+      "category": "typescript",
+      "difficulty": "easy",
+      "type": "multiple_choice",
+      "choices": [
+        {
+          "id": "a",
+          "text": "Required<T>",
+          "isCorrect": false
+        },
+        {
+          "id": "b",
+          "text": "Partial<T>",
+          "isCorrect": true
+        },
+        {
+          "id": "c",
+          "text": "Omit<T, K>",
+          "isCorrect": false
+        },
+        {
+          "id": "d",
+          "text": "Readonly<T>",
+          "isCorrect": false
+        }
+      ],
+      "codeSnippet": null,
+      "expectedOutput": null,
+      "expectedKeywords": null,
+      "requiredKeywordCount": null,
+      "createdAt": "2026-10-25T08:04:50.216Z",
+      "updatedAt": "2026-10-25T08:04:50.216Z"
+    },
+    {
+      "id": 113,
+      "ownerId": 1,
+      "ownerUsername": "alex_dev",
+      "prompt": "What is the purpose of the `infer` keyword inside conditional types in TypeScript?",
+      "category": "typescript",
+      "difficulty": "hard",
+      "type": "short_answer",
+      "choices": null,
+      "codeSnippet": null,
+      "expectedOutput": null,
+      "expectedKeywords": [
+        "deduce",
+        "extract",
+        "variable",
+        "conditional",
+        "generic",
+        "type"
+      ],
+      "requiredKeywordCount": 2,
+      "createdAt": "2026-10-25T08:04:50.216Z",
+      "updatedAt": "2026-10-25T08:04:50.216Z"
+    },
+    {
+      "id": 114,
+      "ownerId": 1,
+      "ownerUsername": "alex_dev",
+      "prompt": "What is the exact output of this TypeScript mapped tuple reduction?",
+      "category": "typescript",
+      "difficulty": "hard",
+      "type": "code_output",
+      "choices": null,
+      "codeSnippet": "const tuple = ['GET', 'POST'] as const;\nconst mapped = tuple.map(method => method.toLowerCase());\nconsole.log(mapped.length, mapped[0]);",
+      "expectedOutput": "2 get",
+      "expectedKeywords": null,
+      "requiredKeywordCount": null,
+      "createdAt": "2026-10-25T08:04:50.216Z",
+      "updatedAt": "2026-10-25T08:04:50.216Z"
+    },
+    {
+      "id": 115,
+      "ownerId": 1,
+      "ownerUsername": "alex_dev",
+      "prompt": "What does this JavaScript expression output?",
+      "category": "javascript",
+      "difficulty": "easy",
+      "type": "code_output",
+      "choices": null,
+      "codeSnippet": "console.log(typeof null, typeof NaN);",
+      "expectedOutput": "object number",
+      "expectedKeywords": null,
+      "requiredKeywordCount": null,
+      "createdAt": "2026-10-25T08:04:50.216Z",
+      "updatedAt": "2026-10-25T08:04:50.216Z"
+    },
+    {
+      "id": 116,
+      "ownerId": 1,
+      "ownerUsername": "alex_dev",
+      "prompt": "What is the order of execution in the JavaScript Event Loop between Microtasks and Macrotasks?",
+      "category": "javascript",
+      "difficulty": "medium",
+      "type": "multiple_choice",
+      "choices": [
+        {
+          "id": "a",
+          "text": "Macrotasks (e.g. setTimeout) are always prioritized over microtasks (e.g. Promises)",
+          "isCorrect": false
+        },
+        {
+          "id": "b",
+          "text": "All microtasks in the microtask queue are drained before the next macrotask is executed",
+          "isCorrect": true
+        },
+        {
+          "id": "c",
+          "text": "They run concurrently on two separate CPU threads",
+          "isCorrect": false
+        },
+        {
+          "id": "d",
+          "text": "Microtasks only run when the browser tab loses focus",
+          "isCorrect": false
+        }
+      ],
+      "codeSnippet": null,
+      "expectedOutput": null,
+      "expectedKeywords": null,
+      "requiredKeywordCount": null,
+      "createdAt": "2026-10-25T08:04:50.216Z",
+      "updatedAt": "2026-10-25T08:04:50.216Z"
+    },
+    {
+      "id": 117,
+      "ownerId": 1,
+      "ownerUsername": "alex_dev",
+      "prompt": "What is the console output of this closure and hoisting snippet?",
+      "category": "javascript",
+      "difficulty": "medium",
+      "type": "code_output",
+      "choices": null,
+      "codeSnippet": "const arr = [1, 2, 3];\nconst result = arr.map(x => x * 2).filter(x => x > 2);\nconsole.log(JSON.stringify(result));",
+      "expectedOutput": "[4,6]",
+      "expectedKeywords": null,
+      "requiredKeywordCount": null,
+      "createdAt": "2026-10-25T08:04:50.216Z",
+      "updatedAt": "2026-10-25T08:04:50.216Z"
+    },
+    {
+      "id": 118,
+      "ownerId": 1,
+      "ownerUsername": "alex_dev",
+      "prompt": "Explain what a Closure is in JavaScript and provide a common real-world use case.",
+      "category": "javascript",
+      "difficulty": "medium",
+      "type": "short_answer",
+      "choices": null,
+      "codeSnippet": null,
+      "expectedOutput": null,
+      "expectedKeywords": [
+        "lexical",
+        "scope",
+        "outer",
+        "state",
+        "encapsulation",
+        "variable"
+      ],
+      "requiredKeywordCount": 2,
+      "createdAt": "2026-10-25T08:04:50.216Z",
+      "updatedAt": "2026-10-25T08:04:50.216Z"
+    },
+    {
+      "id": 119,
+      "ownerId": 1,
+      "ownerUsername": "alex_dev",
+      "prompt": "What is the exact result printed by this JavaScript prototype chain test?",
+      "category": "javascript",
+      "difficulty": "hard",
+      "type": "code_output",
+      "choices": null,
+      "codeSnippet": "const proto = { base: true };\nconst obj = Object.create(proto);\nobj.val = 42;\nconsole.log(obj.hasOwnProperty('base'), 'base' in obj);",
+      "expectedOutput": "false true",
+      "expectedKeywords": null,
+      "requiredKeywordCount": null,
+      "createdAt": "2026-10-25T08:04:50.216Z",
+      "updatedAt": "2026-10-25T08:04:50.216Z"
+    },
+    {
+      "id": 120,
+      "ownerId": 1,
+      "ownerUsername": "alex_dev",
+      "prompt": "Which method creates a shallow copy of an object while merging properties?",
+      "category": "javascript",
+      "difficulty": "easy",
+      "type": "multiple_choice",
+      "choices": [
+        {
+          "id": "a",
+          "text": "Object.freeze()",
+          "isCorrect": false
+        },
+        {
+          "id": "b",
+          "text": "Object.assign()",
+          "isCorrect": true
+        },
+        {
+          "id": "c",
+          "text": "Object.seal()",
+          "isCorrect": false
+        },
+        {
+          "id": "d",
+          "text": "Object.create(null)",
+          "isCorrect": false
+        }
+      ],
+      "codeSnippet": null,
+      "expectedOutput": null,
+      "expectedKeywords": null,
+      "requiredKeywordCount": null,
+      "createdAt": "2026-10-25T08:04:50.216Z",
+      "updatedAt": "2026-10-25T08:04:50.216Z"
+    },
+    {
+      "id": 121,
+      "ownerId": 1,
+      "ownerUsername": "alex_dev",
+      "prompt": "How does Node.js handle non-blocking I/O operations under the hood?",
+      "category": "nodejs",
+      "difficulty": "medium",
+      "type": "short_answer",
+      "choices": null,
+      "codeSnippet": null,
+      "expectedOutput": null,
+      "expectedKeywords": [
+        "libuv",
+        "thread pool",
+        "event loop",
+        "asynchronous",
+        "kernel"
+      ],
+      "requiredKeywordCount": 2,
+      "createdAt": "2026-10-25T08:04:50.216Z",
+      "updatedAt": "2026-10-25T08:04:50.216Z"
+    },
+    {
+      "id": 122,
+      "ownerId": 1,
+      "ownerUsername": "alex_dev",
+      "prompt": "In the Node.js event loop, when is `process.nextTick()` callbacks processed?",
+      "category": "nodejs",
+      "difficulty": "medium",
+      "type": "multiple_choice",
+      "choices": [
+        {
+          "id": "a",
+          "text": "In the timers phase along with setTimeout",
+          "isCorrect": false
+        },
+        {
+          "id": "b",
+          "text": "Immediately after the current operation finishes, before the event loop continues",
+          "isCorrect": true
+        },
+        {
+          "id": "c",
+          "text": "Only in the check phase after setImmediate",
+          "isCorrect": false
+        },
+        {
+          "id": "d",
+          "text": "In the close callbacks phase",
+          "isCorrect": false
+        }
+      ],
+      "codeSnippet": null,
+      "expectedOutput": null,
+      "expectedKeywords": null,
+      "requiredKeywordCount": null,
+      "createdAt": "2026-10-25T08:04:50.216Z",
+      "updatedAt": "2026-10-25T08:04:50.216Z"
+    },
+    {
+      "id": 123,
+      "ownerId": 1,
+      "ownerUsername": "alex_dev",
+      "prompt": "What will this Node.js buffer and string encoding snippet output?",
+      "category": "nodejs",
+      "difficulty": "easy",
+      "type": "code_output",
+      "choices": null,
+      "codeSnippet": "const buf = Buffer.from('hello');\nconsole.log(buf.length, buf.toString('utf8'));",
+      "expectedOutput": "5 hello",
+      "expectedKeywords": null,
+      "requiredKeywordCount": null,
+      "createdAt": "2026-10-25T08:04:50.216Z",
+      "updatedAt": "2026-10-25T08:04:50.216Z"
+    },
+    {
+      "id": 124,
+      "ownerId": 1,
+      "ownerUsername": "alex_dev",
+      "prompt": "Explain what backpressure is in Node.js streams and why it is critical for high-throughput servers.",
+      "category": "nodejs",
+      "difficulty": "hard",
+      "type": "short_answer",
+      "choices": null,
+      "codeSnippet": null,
+      "expectedOutput": null,
+      "expectedKeywords": [
+        "memory",
+        "buffer",
+        "drain",
+        "write",
+        "fast",
+        "overflow"
+      ],
+      "requiredKeywordCount": 2,
+      "createdAt": "2026-10-25T08:04:50.216Z",
+      "updatedAt": "2026-10-25T08:04:50.216Z"
+    },
+    {
+      "id": 125,
+      "ownerId": 1,
+      "ownerUsername": "alex_dev",
+      "prompt": "Which Node.js core module provides cryptographic functionality including hashes, HMAC, and ciphers?",
+      "category": "nodejs",
+      "difficulty": "easy",
+      "type": "multiple_choice",
+      "choices": [
+        {
+          "id": "a",
+          "text": "crypto",
+          "isCorrect": true
+        },
+        {
+          "id": "b",
+          "text": "tls",
+          "isCorrect": false
+        },
+        {
+          "id": "c",
+          "text": "security",
+          "isCorrect": false
+        },
+        {
+          "id": "d",
+          "text": "hashlib",
+          "isCorrect": false
+        }
+      ],
+      "codeSnippet": null,
+      "expectedOutput": null,
+      "expectedKeywords": null,
+      "requiredKeywordCount": null,
+      "createdAt": "2026-10-25T08:04:50.216Z",
+      "updatedAt": "2026-10-25T08:04:50.216Z"
+    },
+    {
+      "id": 126,
+      "ownerId": 1,
+      "ownerUsername": "alex_dev",
+      "prompt": "What does this Node.js URL parsing code print?",
+      "category": "nodejs",
+      "difficulty": "easy",
+      "type": "code_output",
+      "choices": null,
+      "codeSnippet": "const url = new URL('https://example.com/api/v1?tag=code&sort=desc');\nconsole.log(url.pathname, url.searchParams.get('sort'));",
+      "expectedOutput": "/api/v1 desc",
+      "expectedKeywords": null,
+      "requiredKeywordCount": null,
+      "createdAt": "2026-10-25T08:04:50.216Z",
+      "updatedAt": "2026-10-25T08:04:50.216Z"
+    },
+    {
+      "id": 127,
+      "ownerId": 1,
+      "ownerUsername": "alex_dev",
+      "prompt": "What is the role of a NestJS Guard?",
+      "category": "nestjs",
+      "difficulty": "easy",
+      "type": "multiple_choice",
+      "choices": [
+        {
+          "id": "a",
+          "text": "To transform and sanitize request data before it hits the route handler",
+          "isCorrect": false
+        },
+        {
+          "id": "b",
+          "text": "To determine whether a request will be handled by the route handler based on conditions like authentication or roles",
+          "isCorrect": true
+        },
+        {
+          "id": "c",
+          "text": "To format exception responses globally into standard JSON",
+          "isCorrect": false
+        },
+        {
+          "id": "d",
+          "text": "To execute database transactions automatically",
+          "isCorrect": false
+        }
+      ],
+      "codeSnippet": null,
+      "expectedOutput": null,
+      "expectedKeywords": null,
+      "requiredKeywordCount": null,
+      "createdAt": "2026-10-25T08:04:50.216Z",
+      "updatedAt": "2026-10-25T08:04:50.216Z"
+    },
+    {
+      "id": 128,
+      "ownerId": 1,
+      "ownerUsername": "alex_dev",
+      "prompt": "Describe the execution order of NestJS lifecycle components when an HTTP request arrives (Pipes, Guards, Interceptors, Middleware).",
+      "category": "nestjs",
+      "difficulty": "hard",
+      "type": "short_answer",
+      "choices": null,
+      "codeSnippet": null,
+      "expectedOutput": null,
+      "expectedKeywords": [
+        "middleware",
+        "guards",
+        "interceptors",
+        "pipes",
+        "controller"
+      ],
+      "requiredKeywordCount": 3,
+      "createdAt": "2026-10-25T08:04:50.216Z",
+      "updatedAt": "2026-10-25T08:04:50.216Z"
+    },
+    {
+      "id": 129,
+      "ownerId": 1,
+      "ownerUsername": "alex_dev",
+      "prompt": "Which decorator in NestJS is used to inject custom services or repositories into a class constructor?",
+      "category": "nestjs",
+      "difficulty": "easy",
+      "type": "multiple_choice",
+      "choices": [
+        {
+          "id": "a",
+          "text": "@Injectable()",
+          "isCorrect": false
+        },
+        {
+          "id": "b",
+          "text": "@Inject()",
+          "isCorrect": true
+        },
+        {
+          "id": "c",
+          "text": "@Provider()",
+          "isCorrect": false
+        },
+        {
+          "id": "d",
+          "text": "@Component()",
+          "isCorrect": false
+        }
+      ],
+      "codeSnippet": null,
+      "expectedOutput": null,
+      "expectedKeywords": null,
+      "requiredKeywordCount": null,
+      "createdAt": "2026-10-25T08:04:50.216Z",
+      "updatedAt": "2026-10-25T08:04:50.216Z"
+    },
+    {
+      "id": 130,
+      "ownerId": 1,
+      "ownerUsername": "alex_dev",
+      "prompt": "What is the purpose of `ValidationPipe` with `{ whitelist: true, forbidNonWhitelisted: true }` in NestJS?",
+      "category": "nestjs",
+      "difficulty": "medium",
+      "type": "short_answer",
+      "choices": null,
+      "codeSnippet": null,
+      "expectedOutput": null,
+      "expectedKeywords": [
+        "dto",
+        "strip",
+        "reject",
+        "unknown",
+        "properties",
+        "error"
+      ],
+      "requiredKeywordCount": 2,
+      "createdAt": "2026-10-25T08:04:50.216Z",
+      "updatedAt": "2026-10-25T08:04:50.216Z"
+    },
+    {
+      "id": 131,
+      "ownerId": 1,
+      "ownerUsername": "alex_dev",
+      "prompt": "What does this NestJS route metadata evaluation snippet print?",
+      "category": "nestjs",
+      "difficulty": "medium",
+      "type": "code_output",
+      "choices": null,
+      "codeSnippet": "const metadata = { roles: ['admin', 'manager'], public: false };\nconst isAllowed = (role) => metadata.public || metadata.roles.includes(role);\nconsole.log(isAllowed('admin'), isAllowed('guest'));",
+      "expectedOutput": "true false",
+      "expectedKeywords": null,
+      "requiredKeywordCount": null,
+      "createdAt": "2026-10-25T08:04:50.216Z",
+      "updatedAt": "2026-10-25T08:04:50.216Z"
+    },
+    {
+      "id": 132,
+      "ownerId": 1,
+      "ownerUsername": "alex_dev",
+      "prompt": "What atomic operator in MongoDB is used to increment the value of a numeric field by a specified amount?",
+      "category": "mongodb",
+      "difficulty": "easy",
+      "type": "multiple_choice",
+      "choices": [
+        {
+          "id": "a",
+          "text": "$set",
+          "isCorrect": false
+        },
+        {
+          "id": "b",
+          "text": "$inc",
+          "isCorrect": true
+        },
+        {
+          "id": "c",
+          "text": "$push",
+          "isCorrect": false
+        },
+        {
+          "id": "d",
+          "text": "$add",
+          "isCorrect": false
+        }
+      ],
+      "codeSnippet": null,
+      "expectedOutput": null,
+      "expectedKeywords": null,
+      "requiredKeywordCount": null,
+      "createdAt": "2026-10-25T08:04:50.216Z",
+      "updatedAt": "2026-10-25T08:04:50.216Z"
+    },
+    {
+      "id": 133,
+      "ownerId": 1,
+      "ownerUsername": "alex_dev",
+      "prompt": "Explain what a Compound Index is in MongoDB and how the Equality-Sort-Range (ESR) rule applies to index design.",
+      "category": "mongodb",
+      "difficulty": "hard",
+      "type": "short_answer",
+      "choices": null,
+      "codeSnippet": null,
+      "expectedOutput": null,
+      "expectedKeywords": [
+        "equality",
+        "sort",
+        "range",
+        "fields",
+        "order",
+        "query"
+      ],
+      "requiredKeywordCount": 2,
+      "createdAt": "2026-10-25T08:04:50.216Z",
+      "updatedAt": "2026-10-25T08:04:50.216Z"
+    },
+    {
+      "id": 134,
+      "ownerId": 1,
+      "ownerUsername": "alex_dev",
+      "prompt": "What does this MongoDB query projection filter return?",
+      "category": "mongodb",
+      "difficulty": "medium",
+      "type": "code_output",
+      "choices": null,
+      "codeSnippet": "const doc = { _id: 'mongo_1', id: 42, username: 'dev', passwordHash: 'hash123' };\nconst project = ({ passwordHash, _id, ...safe }) => safe;\nconsole.log(JSON.stringify(project(doc)));",
+      "expectedOutput": "{\"id\":42,\"username\":\"dev\"}",
+      "expectedKeywords": null,
+      "requiredKeywordCount": null,
+      "createdAt": "2026-10-25T08:04:50.216Z",
+      "updatedAt": "2026-10-25T08:04:50.216Z"
+    },
+    {
+      "id": 135,
+      "ownerId": 1,
+      "ownerUsername": "alex_dev",
+      "prompt": "What is the default index created automatically by MongoDB on every collection?",
+      "category": "mongodb",
+      "difficulty": "easy",
+      "type": "multiple_choice",
+      "choices": [
+        {
+          "id": "a",
+          "text": "_id index",
+          "isCorrect": true
+        },
+        {
+          "id": "b",
+          "text": "createdAt index",
+          "isCorrect": false
+        },
+        {
+          "id": "c",
+          "text": "text index",
+          "isCorrect": false
+        },
+        {
+          "id": "d",
+          "text": "uuid index",
+          "isCorrect": false
+        }
+      ],
+      "codeSnippet": null,
+      "expectedOutput": null,
+      "expectedKeywords": null,
+      "requiredKeywordCount": null,
+      "createdAt": "2026-10-25T08:04:50.216Z",
+      "updatedAt": "2026-10-25T08:04:50.216Z"
+    },
+    {
+      "id": 136,
+      "ownerId": 1,
+      "ownerUsername": "alex_dev",
+      "prompt": "In MongoDB, what does the `upsert: true` option accomplish in an update operation?",
+      "category": "mongodb",
+      "difficulty": "medium",
+      "type": "short_answer",
+      "choices": null,
+      "codeSnippet": null,
+      "expectedOutput": null,
+      "expectedKeywords": [
+        "insert",
+        "create",
+        "update",
+        "match",
+        "exists",
+        "document"
+      ],
+      "requiredKeywordCount": 2,
+      "createdAt": "2026-10-25T08:04:50.216Z",
+      "updatedAt": "2026-10-25T08:04:50.216Z"
+    },
+    {
+      "id": 137,
+      "ownerId": 1,
+      "ownerUsername": "alex_dev",
+      "prompt": "What is the difference between `git merge` and `git rebase`?",
+      "category": "git",
+      "difficulty": "medium",
+      "type": "short_answer",
+      "choices": null,
+      "codeSnippet": null,
+      "expectedOutput": null,
+      "expectedKeywords": [
+        "history",
+        "linear",
+        "commit",
+        "branch",
+        "fast-forward"
+      ],
+      "requiredKeywordCount": 2,
+      "createdAt": "2026-10-25T08:04:50.216Z",
+      "updatedAt": "2026-10-25T08:04:50.216Z"
+    },
+    {
+      "id": 138,
+      "ownerId": 1,
+      "ownerUsername": "alex_dev",
+      "prompt": "Which Git command discards all unstaged working directory changes in tracked files?",
+      "category": "git",
+      "difficulty": "easy",
+      "type": "multiple_choice",
+      "choices": [
+        {
+          "id": "a",
+          "text": "git restore .",
+          "isCorrect": true
+        },
+        {
+          "id": "b",
+          "text": "git commit --amend",
+          "isCorrect": false
+        },
+        {
+          "id": "c",
+          "text": "git branch -D",
+          "isCorrect": false
+        },
+        {
+          "id": "d",
+          "text": "git stash pop",
+          "isCorrect": false
+        }
+      ],
+      "codeSnippet": null,
+      "expectedOutput": null,
+      "expectedKeywords": null,
+      "requiredKeywordCount": null,
+      "createdAt": "2026-10-25T08:04:50.216Z",
+      "updatedAt": "2026-10-25T08:04:50.216Z"
+    },
+    {
+      "id": 139,
+      "ownerId": 1,
+      "ownerUsername": "alex_dev",
+      "prompt": "What will this Git branch and merge simulation code print?",
+      "category": "git",
+      "difficulty": "easy",
+      "type": "code_output",
+      "choices": null,
+      "codeSnippet": "const branches = ['main', 'feature/auth', 'hotfix/101'];\nconst clean = branches.filter(b => !b.startsWith('hotfix'));\nconsole.log(clean.length, clean[1]);",
+      "expectedOutput": "2 feature/auth",
+      "expectedKeywords": null,
+      "requiredKeywordCount": null,
+      "createdAt": "2026-10-25T08:04:50.216Z",
+      "updatedAt": "2026-10-25T08:04:50.216Z"
+    },
+    {
+      "id": 140,
+      "ownerId": 1,
+      "ownerUsername": "alex_dev",
+      "prompt": "What is the difference between `git fetch` and `git pull`?",
+      "category": "git",
+      "difficulty": "easy",
+      "type": "multiple_choice",
+      "choices": [
+        {
+          "id": "a",
+          "text": "git fetch downloads commits from remote without merging; git pull fetches and automatically merges",
+          "isCorrect": true
+        },
+        {
+          "id": "b",
+          "text": "git pull only works with SSH keys; git fetch works with HTTPS",
+          "isCorrect": false
+        },
+        {
+          "id": "c",
+          "text": "git fetch deletes branches deleted on the remote",
+          "isCorrect": false
+        },
+        {
+          "id": "d",
+          "text": "They are identical commands with no distinction",
+          "isCorrect": false
+        }
+      ],
+      "codeSnippet": null,
+      "expectedOutput": null,
+      "expectedKeywords": null,
+      "requiredKeywordCount": null,
+      "createdAt": "2026-10-25T08:04:50.216Z",
+      "updatedAt": "2026-10-25T08:04:50.216Z"
+    },
+    {
+      "id": 141,
+      "ownerId": 1,
+      "ownerUsername": "alex_dev",
+      "prompt": "What is the average time complexity of lookups in a well-balanced Hash Map?",
+      "category": "datastructures",
+      "difficulty": "easy",
+      "type": "multiple_choice",
+      "choices": [
+        {
+          "id": "a",
+          "text": "O(1)",
+          "isCorrect": true
+        },
+        {
+          "id": "b",
+          "text": "O(n)",
+          "isCorrect": false
+        },
+        {
+          "id": "c",
+          "text": "O(log n)",
+          "isCorrect": false
+        },
+        {
+          "id": "d",
+          "text": "O(n log n)",
+          "isCorrect": false
+        }
+      ],
+      "codeSnippet": null,
+      "expectedOutput": null,
+      "expectedKeywords": null,
+      "requiredKeywordCount": null,
+      "createdAt": "2026-10-25T08:04:50.216Z",
+      "updatedAt": "2026-10-25T08:04:50.216Z"
+    },
+    {
+      "id": 142,
+      "ownerId": 1,
+      "ownerUsername": "alex_dev",
+      "prompt": "Describe the Stack data structure and list its primary access principle (LIFO or FIFO) and primary operations.",
+      "category": "datastructures",
+      "difficulty": "easy",
+      "type": "short_answer",
+      "choices": null,
+      "codeSnippet": null,
+      "expectedOutput": null,
+      "expectedKeywords": [
+        "lifo",
+        "push",
+        "pop",
+        "peek",
+        "last in first out"
+      ],
+      "requiredKeywordCount": 2,
+      "createdAt": "2026-10-25T08:04:50.216Z",
+      "updatedAt": "2026-10-25T08:04:50.216Z"
+    },
+    {
+      "id": 143,
+      "ownerId": 1,
+      "ownerUsername": "alex_dev",
+      "prompt": "What does this binary search iteration code output?",
+      "category": "datastructures",
+      "difficulty": "medium",
+      "type": "code_output",
+      "choices": null,
+      "codeSnippet": "function binarySearch(arr, target) {\n  let l = 0, r = arr.length - 1;\n  while (l <= r) {\n    const m = Math.floor((l + r) / 2);\n    if (arr[m] === target) return m;\n    if (arr[m] < target) l = m + 1;\n    else r = m - 1;\n  }\n  return -1;\n}\nconsole.log(binarySearch([10, 20, 30, 40, 50], 40));",
+      "expectedOutput": "3",
+      "expectedKeywords": null,
+      "requiredKeywordCount": null,
+      "createdAt": "2026-10-25T08:04:50.216Z",
+      "updatedAt": "2026-10-25T08:04:50.216Z"
+    }
+  ],
+  "interviews": [
+    {
+      "id": 1,
+      "ownerId": 1,
+      "ownerUsername": "alex_dev",
+      "title": "Frontend React & Modern Architecture Warm-up",
+      "description": "Essential questions on hooks, state transitions, virtual DOM diffing, and closures.",
+      "category": "react",
+      "difficulty": "easy",
+      "questionIds": [
+        101,
+        102,
+        103,
+        115,
+        120
+      ],
+      "timeLimitSeconds": 600,
+      "createdAt": "2026-10-25T08:04:50.216Z",
+      "updatedAt": "2026-10-25T08:04:50.216Z"
+    },
+    {
+      "id": 2,
+      "ownerId": 1,
+      "ownerUsername": "alex_dev",
+      "title": "Fullstack TypeScript & Node.js Core Competency",
+      "description": "Deep dive into asynchronous runtimes, type narrowing, streams, and event loops.",
+      "category": "typescript",
+      "difficulty": "medium",
+      "questionIds": [
+        109,
+        110,
+        111,
+        121,
+        122,
+        123
+      ],
+      "timeLimitSeconds": 900,
+      "createdAt": "2026-10-25T08:04:50.216Z",
+      "updatedAt": "2026-10-25T08:04:50.216Z"
+    },
+    {
+      "id": 3,
+      "ownerId": 1,
+      "ownerUsername": "alex_dev",
+      "title": "Backend Systems, NestJS & MongoDB",
+      "description": "Architecting modular APIs with NestJS guards, atomic counter incrementation, and indexing.",
+      "category": "nestjs",
+      "difficulty": "hard",
+      "questionIds": [
+        127,
+        128,
+        130,
+        132,
+        133,
+        136
+      ],
+      "timeLimitSeconds": 1200,
+      "createdAt": "2026-10-25T08:04:50.216Z",
+      "updatedAt": "2026-10-25T08:04:50.216Z"
+    },
+    {
+      "id": 4,
+      "ownerId": 1,
+      "ownerUsername": "alex_dev",
+      "title": "Engineering Foundations: Git & Data Structures",
+      "description": "Core concepts every engineer needs: hashing, stack principles, branching, and binary search.",
+      "category": "datastructures",
+      "difficulty": "medium",
+      "questionIds": [
+        137,
+        138,
+        140,
+        141,
+        142,
+        143
+      ],
+      "timeLimitSeconds": 720,
+      "createdAt": "2026-10-25T08:04:50.216Z",
+      "updatedAt": "2026-10-25T08:04:50.216Z"
+    }
+  ],
+  "attempts": [
+    {
+      "id": 51,
+      "interviewId": 1,
+      "interviewTitle": "Frontend React & Modern Architecture Warm-up",
+      "userId": 2,
+      "status": "finished",
+      "startedAt": "2026-10-25T08:05:18.306Z",
+      "deadlineAt": "2026-10-25T08:15:18.306Z",
+      "finishedAt": "2026-10-25T08:05:18.342Z",
+      "timeLimitSeconds": 600,
+      "questions": [
+        {
+          "questionId": 101,
+          "position": 1,
+          "prompt": "Why does React require a unique `key` prop when rendering a dynamic list of items?",
+          "type": "short_answer",
+          "difficulty": "easy",
+          "category": "react",
+          "choices": null,
+          "codeSnippet": null,
+          "expectedOutput": null,
+          "expectedKeywords": [
+            "identity",
+            "reorder",
+            "re-render",
+            "diffing",
+            "virtual dom"
+          ],
+          "requiredKeywordCount": 2
+        },
+        {
+          "questionId": 102,
+          "position": 2,
+          "prompt": "Which React hook should be preferred to preserve a mutable value across renders without causing a re-render?",
+          "type": "multiple_choice",
+          "difficulty": "easy",
+          "category": "react",
+          "choices": [
+            {
+              "id": "a",
+              "text": "useState",
+              "isCorrect": false
+            },
+            {
+              "id": "b",
+              "text": "useRef",
+              "isCorrect": true
+            },
+            {
+              "id": "c",
+              "text": "useMemo",
+              "isCorrect": false
+            },
+            {
+              "id": "d",
+              "text": "useCallback",
+              "isCorrect": false
+            }
+          ],
+          "codeSnippet": null,
+          "expectedOutput": null,
+          "expectedKeywords": null,
+          "requiredKeywordCount": null
+        },
+        {
+          "questionId": 103,
+          "position": 3,
+          "prompt": "What will be printed to the console when clicking the button once?",
+          "type": "code_output",
+          "difficulty": "medium",
+          "category": "react",
+          "choices": null,
+          "codeSnippet": "function Counter() {\n  const [count, setCount] = useState(0);\n  const handleClick = () => {\n    setCount(count + 1);\n    setCount(count + 1);\n    console.log(count);\n  };\n  return <button onClick={handleClick}>Click</button>;\n}",
+          "expectedOutput": "0",
+          "expectedKeywords": null,
+          "requiredKeywordCount": null
+        },
+        {
+          "questionId": 115,
+          "position": 4,
+          "prompt": "What does this JavaScript expression output?",
+          "type": "code_output",
+          "difficulty": "easy",
+          "category": "javascript",
+          "choices": null,
+          "codeSnippet": "console.log(typeof null, typeof NaN);",
+          "expectedOutput": "object number",
+          "expectedKeywords": null,
+          "requiredKeywordCount": null
+        },
+        {
+          "questionId": 120,
+          "position": 5,
+          "prompt": "Which method creates a shallow copy of an object while merging properties?",
+          "type": "multiple_choice",
+          "difficulty": "easy",
+          "category": "javascript",
+          "choices": [
+            {
+              "id": "a",
+              "text": "Object.freeze()",
+              "isCorrect": false
+            },
+            {
+              "id": "b",
+              "text": "Object.assign()",
+              "isCorrect": true
+            },
+            {
+              "id": "c",
+              "text": "Object.seal()",
+              "isCorrect": false
+            },
+            {
+              "id": "d",
+              "text": "Object.create(null)",
+              "isCorrect": false
+            }
+          ],
+          "codeSnippet": null,
+          "expectedOutput": null,
+          "expectedKeywords": null,
+          "requiredKeywordCount": null
+        }
+      ],
+      "answeredQuestionIds": [
+        102
+      ],
+      "answers": [
+        {
+          "questionId": 102,
+          "answer": {
+            "type": "multiple_choice",
+            "choiceId": "b"
+          },
+          "submittedAt": "2026-10-25T08:05:18.328Z"
+        }
+      ],
+      "score": 1,
+      "maxScore": 5,
+      "percentage": 20,
+      "readiness": "needs_practice"
+    },
+    {
+      "id": 52,
+      "interviewId": 1,
+      "interviewTitle": "Frontend React & Modern Architecture Warm-up",
+      "userId": 2,
+      "status": "in_progress",
+      "startedAt": "2026-10-25T08:06:23.324Z",
+      "deadlineAt": "2026-10-25T08:16:23.324Z",
+      "finishedAt": null,
+      "timeLimitSeconds": 600,
+      "questions": [
+        {
+          "questionId": 101,
+          "position": 1,
+          "prompt": "Why does React require a unique `key` prop when rendering a dynamic list of items?",
+          "type": "short_answer",
+          "difficulty": "easy",
+          "category": "react",
+          "choices": null,
+          "codeSnippet": null,
+          "expectedOutput": null,
+          "expectedKeywords": [
+            "identity",
+            "reorder",
+            "re-render",
+            "diffing",
+            "virtual dom"
+          ],
+          "requiredKeywordCount": 2
+        },
+        {
+          "questionId": 102,
+          "position": 2,
+          "prompt": "Which React hook should be preferred to preserve a mutable value across renders without causing a re-render?",
+          "type": "multiple_choice",
+          "difficulty": "easy",
+          "category": "react",
+          "choices": [
+            {
+              "id": "a",
+              "text": "useState",
+              "isCorrect": false
+            },
+            {
+              "id": "b",
+              "text": "useRef",
+              "isCorrect": true
+            },
+            {
+              "id": "c",
+              "text": "useMemo",
+              "isCorrect": false
+            },
+            {
+              "id": "d",
+              "text": "useCallback",
+              "isCorrect": false
+            }
+          ],
+          "codeSnippet": null,
+          "expectedOutput": null,
+          "expectedKeywords": null,
+          "requiredKeywordCount": null
+        },
+        {
+          "questionId": 103,
+          "position": 3,
+          "prompt": "What will be printed to the console when clicking the button once?",
+          "type": "code_output",
+          "difficulty": "medium",
+          "category": "react",
+          "choices": null,
+          "codeSnippet": "function Counter() {\n  const [count, setCount] = useState(0);\n  const handleClick = () => {\n    setCount(count + 1);\n    setCount(count + 1);\n    console.log(count);\n  };\n  return <button onClick={handleClick}>Click</button>;\n}",
+          "expectedOutput": "0",
+          "expectedKeywords": null,
+          "requiredKeywordCount": null
+        },
+        {
+          "questionId": 115,
+          "position": 4,
+          "prompt": "What does this JavaScript expression output?",
+          "type": "code_output",
+          "difficulty": "easy",
+          "category": "javascript",
+          "choices": null,
+          "codeSnippet": "console.log(typeof null, typeof NaN);",
+          "expectedOutput": "object number",
+          "expectedKeywords": null,
+          "requiredKeywordCount": null
+        },
+        {
+          "questionId": 120,
+          "position": 5,
+          "prompt": "Which method creates a shallow copy of an object while merging properties?",
+          "type": "multiple_choice",
+          "difficulty": "easy",
+          "category": "javascript",
+          "choices": [
+            {
+              "id": "a",
+              "text": "Object.freeze()",
+              "isCorrect": false
+            },
+            {
+              "id": "b",
+              "text": "Object.assign()",
+              "isCorrect": true
+            },
+            {
+              "id": "c",
+              "text": "Object.seal()",
+              "isCorrect": false
+            },
+            {
+              "id": "d",
+              "text": "Object.create(null)",
+              "isCorrect": false
+            }
+          ],
+          "codeSnippet": null,
+          "expectedOutput": null,
+          "expectedKeywords": null,
+          "requiredKeywordCount": null
+        }
+      ],
+      "answeredQuestionIds": [
+        102
+      ],
+      "answers": [
+        {
+          "questionId": 102,
+          "answer": {
+            "type": "multiple_choice",
+            "choiceId": "b"
+          },
+          "submittedAt": "2026-10-25T08:06:23.342Z"
+        }
+      ],
+      "score": null,
+      "maxScore": null,
+      "percentage": null,
+      "readiness": null
+    }
+  ],
+  "counters": {
+    "users": 10,
+    "questions": 200,
+    "interviews": 10,
+    "attempts": 52
+  }
+}

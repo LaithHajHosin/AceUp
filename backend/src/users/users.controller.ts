@@ -1,26 +1,30 @@
-import { Body, Controller, Get, Param, ParseIntPipe, Patch } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { CurrentUser } from '../common/current-user.decorator.js';
-import { UsersService, type UpdateProfileInput } from './users.service.js';
+import { Controller, Patch, Get, Body, Param, ParseIntPipe, Inject } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { UsersService } from './users.service.js';
+import { UpdateUserDto } from './dto/update-user.dto.js';
+import { CurrentUser, RequestUser } from '../auth/decorators/auth.decorators.js';
 
 @ApiTags('Users')
+@ApiBearerAuth()
 @Controller('users')
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(@Inject(UsersService) private usersService: UsersService) {}
 
   @Patch('me')
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Update the current user profile' })
-  @ApiResponse({ status: 200, description: 'Profile updated.' })
-  updateMe(@CurrentUser() user: { userId: number }, @Body() dto: UpdateProfileInput) {
-    return this.usersService.updateCurrentUser(user.userId, dto);
+  @ApiOperation({ summary: 'Update logged-in user profile (displayName, bio)' })
+  @ApiResponse({ status: 200, description: 'Profile updated' })
+  @ApiResponse({ status: 400, description: 'Validation failed' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async updateMe(@CurrentUser() user: RequestUser, @Body() dto: UpdateUserDto) {
+    return this.usersService.updateMe(user.userId, dto);
   }
 
   @Get(':id/profile')
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get a public profile and stats for a user' })
-  @ApiResponse({ status: 200, description: 'Public profile returned.' })
-  getProfile(@Param('id', ParseIntPipe) userId: number) {
-    return this.usersService.getPublicProfile(userId);
+  @ApiOperation({ summary: 'Get public user profile and calculated statistics' })
+  @ApiResponse({ status: 200, description: 'User profile with statistics' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  async getProfile(@Param('id', ParseIntPipe) id: number) {
+    return this.usersService.getProfile(id);
   }
 }

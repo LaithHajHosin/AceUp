@@ -1,107 +1,56 @@
 import {
-  BadRequestException,
-  ConflictException,
-  ForbiddenException,
   Injectable,
   NotFoundException,
+  ForbiddenException,
+  ConflictException,
+  BadRequestException,
+  Inject,
 } from '@nestjs/common';
-import { InMemoryStore, type AttemptRecord, type Readiness } from '../common/store.service.js';
-
-export interface CreateAttemptInput {
-  interviewId: number;
-}
-
-export interface SubmitAnswerInput {
-  questionId: number;
-  answer: { type: string; choiceId?: string; text?: string };
-}
+import { DatabaseService, AttemptEntity } from '../database/database.service.js';
+import { ScoringService } from './scoring.service.js';
+import { StartAttemptDto, SubmitAnswerDto } from './dto/attempt.dto.js';
 
 @Injectable()
 export class AttemptsService {
-  constructor(private readonly store: InMemoryStore) {}
+  constructor(
+    @Inject(DatabaseService) private db: DatabaseService,
+    @Inject(ScoringService) private scoringService: ScoringService,
+  ) {}
 
-  private nowIso() {
-    return new Date().toISOString();
-  }
-
-  private normalizeShortAnswer(answer: string) {
-    return answer.toLowerCase();
-  }
-
-  private scoreQuestion(question: AttemptRecord['questions'][number], answer: { type: string; choiceId?: string; text?: string } | undefined) {
-    if (!answer) {
-      return 0;
-    }
-
-    if (question.type === 'multiple_choice') {
-      const expected = (question as any).isCorrect ?? null;
-      const chosen = answer.choiceId;
-      return expected !== null && chosen === expected ? 1 : 0;
-    }
-
-    if (question.type === 'short_answer') {
-      const submission = String(answer.text ?? '').trim();
-      const expectedKeywords = question.expectedKeywords ?? [];
-      const requiredCount = question.requiredKeywordCount ?? 0;
-      if (!submission) {
-        return 0;
-      }
-      const matched = expectedKeywords.reduce((count, keyword) => {
-        if (this.normalizeShortAnswer(submission).includes(this.normalizeShortAnswer(keyword))) {
-          return count + 1;
-        }
-        return count;
-      }, 0);
-      if (matched >= requiredCount) return 1;
-      if (matched > 0 && matched < requiredCount) return 0.5;
-      return 0;
-    }
-
-    const expected = String((question as any).expectedOutput ?? '');
-    const normalizedExpected = expected.replace(/\r\n/g, '\n').trim();
-    const normalizedSubmitted = String(answer.text ?? '').replace(/\r\n/g, '\n').trim();
-    return normalizedExpected === normalizedSubmitted ? 1 : 0;
-  }
-
-  private getReadiness(percentage: number): Readiness {
-    if (percentage < 60) return 'needs_practice';
-    if (percentage < 85) return 'almost_ready';
-    return 'ready';
-  }
-
-  private recomputeAttemptMetrics(attempt: AttemptRecord) {
-    const questions = attempt.questions;
-    let score = 0;
-    for (const question of questions) {
-      const answer = attempt.answers[question.questionId];
-      score += this.scoreQuestion(question, answer);
-    }
-
-    const maxScore = questions.length;
-    const percentage = maxScore === 0 ? 0 : Number(((score / maxScore) * 100).toFixed(1));
-    attempt.score = score;
-    attempt.maxScore = maxScore;
-    attempt.percentage = percentage;
-    attempt.readiness = this.getReadiness(percentage);
-    return { score, maxScore, percentage, readiness: attempt.readiness };
-  }
-
-  private applyLazyTimeout(attempt: AttemptRecord) {
+  public checkLazyTimeout(attempt: AttemptEntity): boolean {
     if (attempt.status !== 'in_progress') {
-      return attempt;
+      return false;
     }
+    const deadline = new Date(attempt.deadlineAt).getTime();
     const now = Date.now();
-    const deadlineMs = new Date(attempt.deadlineAt).getTime() + 5000;
-    if (now > deadlineMs) {
+    // 5 seconds network grace (Contract Section 5)
+    if (now > deadline + 5000) {
       attempt.status = 'timed_out';
-      attempt.finishedAt = new Date().toISOString();
-      this.recomputeAttemptMetrics(attempt);
+      attempt.finishedAt = attempt.deadlineAt;
+      const evaluation = this.scoringService.evaluateAttempt(attempt);
+      attempt.score = evaluation.score;
+      attempt.maxScore = evaluation.maxScore;
+      attempt.percentage = evaluation.percentage;
+      attempt.readiness = evaluation.readiness;
+      this.db.saveToDisk();
+      return true;
     }
-    return attempt;
+    return false;
   }
 
-  private safeAttempt(attempt: AttemptRecord) {
-    const answeredQuestionIds = Object.keys(attempt.answers).map(Number);
+  private formatAttempt(attempt: AttemptEntity) {
+    // Safe AttemptQuestion format (hiding correct choices and answers)
+    const safeQuestions = attempt.questions.map(q => ({
+      questionId: q.questionId,
+      position: q.position,
+      prompt: q.prompt,
+      type: q.type,
+      difficulty: q.difficulty,
+      category: q.category,
+      choices: q.choices ? q.choices.map(c => ({ id: c.id, text: c.text })) : null,
+      codeSnippet: q.type === 'code_output' ? q.codeSnippet : null,
+    }));
+
     return {
       id: attempt.id,
       interviewId: attempt.interviewId,
@@ -112,241 +61,263 @@ export class AttemptsService {
       deadlineAt: attempt.deadlineAt,
       finishedAt: attempt.finishedAt,
       timeLimitSeconds: attempt.timeLimitSeconds,
-      questions: attempt.questions.map((question) => ({
-        questionId: question.questionId,
-        position: question.position,
-        prompt: question.prompt,
-        type: question.type,
-        difficulty: question.difficulty,
-        category: question.category,
-        choices: question.choices,
-        codeSnippet: question.codeSnippet,
-      })),
-      answeredQuestionIds,
-      score: attempt.score,
-      maxScore: attempt.maxScore,
-      percentage: attempt.percentage,
-      readiness: attempt.readiness,
+      questions: safeQuestions,
+      answeredQuestionIds: attempt.answeredQuestionIds,
+      score: attempt.status === 'in_progress' ? null : attempt.score,
+      maxScore: attempt.status === 'in_progress' ? null : attempt.maxScore,
+      percentage: attempt.status === 'in_progress' ? null : attempt.percentage,
+      readiness: attempt.status === 'in_progress' ? null : attempt.readiness,
     };
   }
 
-  listAttempts(userId: number, status?: string, interviewId?: string) {
-    return this.store.attempts
-      .filter((attempt) => attempt.userId === userId)
-      .filter((attempt) => (!status || attempt.status === status))
-      .filter((attempt) => (!interviewId || String(attempt.interviewId) === String(interviewId)))
-      .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())
-      .map((attempt) => {
-        const finalAttempt = this.applyLazyTimeout({ ...attempt, answers: { ...attempt.answers } });
-        return {
-          id: finalAttempt.id,
-          interviewId: finalAttempt.interviewId,
-          interviewTitle: finalAttempt.interviewTitle,
-          status: finalAttempt.status,
-          startedAt: finalAttempt.startedAt,
-          finishedAt: finalAttempt.finishedAt,
-          score: finalAttempt.score,
-          maxScore: finalAttempt.maxScore,
-          percentage: finalAttempt.percentage,
-          readiness: finalAttempt.readiness,
-        };
-      });
-  }
-
-  createAttempt(userId: number, input: CreateAttemptInput) {
-    const interview = this.store.getInterviewById(input.interviewId);
+  async start(dto: StartAttemptDto, userId: number) {
+    const interview = this.db.interviews.find(i => i.id === dto.interviewId);
     if (!interview) {
-      throw new NotFoundException({ code: 'NOT_FOUND', message: 'Interview not found.' });
+      throw new NotFoundException({
+        statusCode: 404,
+        error: 'Not Found',
+        code: 'NOT_FOUND',
+        message: 'Interview not found',
+      });
     }
 
-    const startedAt = new Date();
-    const deadlineAt = new Date(startedAt.getTime() + interview.timeLimitSeconds * 1000).toISOString();
-    const questions = interview.questionIds.map((questionId, index) => {
-      const question = this.store.getQuestionById(questionId);
-      if (!question) {
-        throw new BadRequestException({ code: 'QUESTION_NOT_FOUND_IN_LIST', message: 'Question missing from interview.' });
+    // Freeze snapshot of all questions
+    const snapshots: any[] = [];
+    interview.questionIds.forEach((qId, idx) => {
+      const q = this.db.questions.find(item => item.id === qId);
+      if (q) {
+        snapshots.push({
+          questionId: q.id,
+          position: idx + 1,
+          prompt: q.prompt,
+          type: q.type,
+          difficulty: q.difficulty,
+          category: q.category,
+          choices: q.choices ? q.choices.map(c => ({ id: c.id, text: c.text, isCorrect: c.isCorrect })) : null,
+          codeSnippet: q.codeSnippet,
+          expectedOutput: q.expectedOutput,
+          expectedKeywords: q.expectedKeywords,
+          requiredKeywordCount: q.requiredKeywordCount,
+        });
       }
-      const snapshot = {
-        questionId: question.id,
-        position: index + 1,
-        prompt: question.prompt,
-        type: question.type,
-        difficulty: question.difficulty,
-        category: question.category,
-        choices: question.type === 'multiple_choice' ? (question.choices ?? []).map(({ id, text }) => ({ id, text })) : null,
-        codeSnippet: question.type === 'code_output' ? question.codeSnippet : null,
-        expectedKeywords: question.expectedKeywords,
-        requiredKeywordCount: question.requiredKeywordCount,
-        expectedOutput: question.expectedOutput,
-        isCorrect: question.type === 'multiple_choice' ? question.choices?.find((choice) => choice.isCorrect)?.id ?? null : null,
-      };
-      return snapshot;
     });
 
-    const created: AttemptRecord = {
-      id: this.store.nextId('attempts'),
+    const now = new Date();
+    const startedAt = now.toISOString();
+    const deadlineAt = new Date(now.getTime() + interview.timeLimitSeconds * 1000).toISOString();
+    const attemptId = this.db.getNextId('attempts');
+
+    const newAttempt: AttemptEntity = {
+      id: attemptId,
       interviewId: interview.id,
       interviewTitle: interview.title,
       userId,
       status: 'in_progress',
-      startedAt: startedAt.toISOString(),
+      startedAt,
       deadlineAt,
       finishedAt: null,
       timeLimitSeconds: interview.timeLimitSeconds,
-      questions,
-      answers: {},
+      questions: snapshots,
+      answeredQuestionIds: [],
+      answers: [],
       score: null,
       maxScore: null,
       percentage: null,
       readiness: null,
     };
 
-    this.store.attempts.push(created);
-    return this.safeAttempt(created);
+    this.db.attempts.push(newAttempt);
+    this.db.saveToDisk();
+
+    return this.formatAttempt(newAttempt);
   }
 
-  getAttempt(userId: number, attemptId: number) {
-    const attempt = this.store.getAttemptById(attemptId);
-    if (!attempt) {
-      throw new NotFoundException({ code: 'NOT_FOUND', message: 'Attempt not found.' });
+  async findAll(userId: number, isAdmin: boolean, status?: string, interviewId?: number) {
+    let list = this.db.attempts.filter(a => isAdmin || a.userId === userId);
+
+    list.forEach(a => this.checkLazyTimeout(a));
+
+    if (status) {
+      list = list.filter(a => a.status === status);
     }
-    if (attempt.userId !== userId) {
-      throw new ForbiddenException({ code: 'NOT_OWNER', message: 'You are not allowed to access this attempt.' });
+    if (interviewId) {
+      list = list.filter(a => a.interviewId === interviewId);
     }
-    this.applyLazyTimeout(attempt);
-    return this.safeAttempt(attempt);
+
+    list.sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
+
+    return list.map(a => ({
+      id: a.id,
+      interviewId: a.interviewId,
+      interviewTitle: a.interviewTitle,
+      userId: a.userId,
+      status: a.status,
+      startedAt: a.startedAt,
+      finishedAt: a.finishedAt,
+      score: a.status === 'in_progress' ? null : a.score,
+      maxScore: a.status === 'in_progress' ? null : a.maxScore,
+      percentage: a.status === 'in_progress' ? null : a.percentage,
+      readiness: a.status === 'in_progress' ? null : a.readiness,
+    }));
   }
 
-  submitAnswer(userId: number, attemptId: number, input: SubmitAnswerInput) {
-    const attempt = this.store.getAttemptById(attemptId);
+  async findOne(id: number, userId: number, isAdmin: boolean) {
+    const attempt = this.db.attempts.find(a => a.id === id);
     if (!attempt) {
-      throw new NotFoundException({ code: 'NOT_FOUND', message: 'Attempt not found.' });
-    }
-    if (attempt.userId !== userId) {
-      throw new ForbiddenException({ code: 'NOT_OWNER', message: 'You are not allowed to answer this attempt.' });
+      throw new NotFoundException({ statusCode: 404, error: 'Not Found', code: 'NOT_FOUND', message: 'Attempt not found' });
     }
 
-    this.applyLazyTimeout(attempt);
+    if (attempt.userId !== userId && !isAdmin) {
+      throw new ForbiddenException({ statusCode: 403, error: 'Forbidden', code: 'NOT_OWNER', message: 'Not owner of attempt' });
+    }
+
+    this.checkLazyTimeout(attempt);
+    return this.formatAttempt(attempt);
+  }
+
+  async submitAnswer(id: number, dto: SubmitAnswerDto, userId: number, isAdmin: boolean) {
+    const attempt = this.db.attempts.find(a => a.id === id);
+    if (!attempt) {
+      throw new NotFoundException({ statusCode: 404, error: 'Not Found', code: 'NOT_FOUND', message: 'Attempt not found' });
+    }
+
+    if (attempt.userId !== userId && !isAdmin) {
+      throw new ForbiddenException({ statusCode: 403, error: 'Forbidden', code: 'NOT_OWNER', message: 'Not owner of attempt' });
+    }
+
+    const timedOut = this.checkLazyTimeout(attempt);
+    if (timedOut) {
+      throw new ConflictException({
+        statusCode: 409,
+        error: 'Conflict',
+        code: 'ANSWER_LATE',
+        message: 'Answer submitted after deadline (grace period expired). Attempt has timed out.',
+      });
+    }
+
     if (attempt.status !== 'in_progress') {
-      throw new ConflictException({ code: 'ATTEMPT_ENDED', message: 'This attempt is no longer active.' });
+      throw new ConflictException({
+        statusCode: 409,
+        error: 'Conflict',
+        code: 'ATTEMPT_ENDED',
+        message: 'Attempt has already ended.',
+      });
     }
 
-    const question = attempt.questions.find((item) => item.questionId === input.questionId);
-    if (!question) {
-      throw new BadRequestException({ code: 'QUESTION_NOT_IN_ATTEMPT', message: 'This question is not part of the attempt.' });
+    const targetQuestion = attempt.questions.find(q => q.questionId === dto.questionId);
+    if (!targetQuestion) {
+      throw new BadRequestException({
+        statusCode: 400,
+        error: 'Bad Request',
+        code: 'QUESTION_NOT_IN_ATTEMPT',
+        message: `Question ${dto.questionId} does not belong to this attempt`,
+      });
     }
 
-    const answer = input.answer;
-    if (answer.type !== question.type) {
-      throw new BadRequestException({ code: 'ANSWER_TYPE_MISMATCH', message: 'Answer type does not match the question type.' });
+    if (attempt.answeredQuestionIds.includes(dto.questionId)) {
+      throw new ConflictException({
+        statusCode: 409,
+        error: 'Conflict',
+        code: 'ANSWER_DUPLICATE',
+        message: 'Question has already been answered',
+      });
     }
 
-    if (question.type === 'multiple_choice') {
-      const validChoice = (question.choices ?? []).some((choice) => choice.id === answer.choiceId);
-      if (!validChoice) {
-        throw new BadRequestException({ code: 'INVALID_CHOICE', message: 'Selected choice is invalid.' });
+    if (dto.answer.type !== targetQuestion.type) {
+      throw new BadRequestException({
+        statusCode: 400,
+        error: 'Bad Request',
+        code: 'ANSWER_TYPE_MISMATCH',
+        message: `Answer type ${dto.answer.type} does not match question type ${targetQuestion.type}`,
+      });
+    }
+
+    if (targetQuestion.type === 'multiple_choice') {
+      if (!dto.answer.choiceId) {
+        throw new BadRequestException({ statusCode: 400, error: 'Bad Request', code: 'VALIDATION_FAILED', message: 'choiceId is required' });
+      }
+      const exists = targetQuestion.choices?.some(c => c.id === dto.answer.choiceId);
+      if (!exists) {
+        throw new BadRequestException({ statusCode: 400, error: 'Bad Request', code: 'INVALID_CHOICE', message: 'choiceId not in choices' });
+      }
+    } else {
+      if (typeof dto.answer.text !== 'string' || dto.answer.text.length > 2000) {
+        throw new BadRequestException({ statusCode: 400, error: 'Bad Request', code: 'VALIDATION_FAILED', message: 'text must be <= 2000 characters' });
+      }
+      if (targetQuestion.type === 'short_answer' && !dto.answer.text.trim()) {
+        throw new BadRequestException({ statusCode: 400, error: 'Bad Request', code: 'VALIDATION_FAILED', message: 'short answer cannot be empty' });
       }
     }
 
-    if (attempt.answers[input.questionId]) {
-      throw new ConflictException({ code: 'ANSWER_DUPLICATE', message: 'This question has already been answered.' });
-    }
+    const submittedAt = new Date().toISOString();
+    attempt.answers.push({
+      questionId: dto.questionId,
+      answer: dto.answer,
+      submittedAt,
+    });
+    attempt.answeredQuestionIds.push(dto.questionId);
+    this.db.saveToDisk();
 
-    const now = Date.now();
-    const graceDeadline = new Date(attempt.deadlineAt).getTime() + 5000;
-    if (now > graceDeadline) {
-      attempt.status = 'timed_out';
-      attempt.finishedAt = this.nowIso();
-      this.recomputeAttemptMetrics(attempt);
-      throw new ConflictException({ code: 'ANSWER_LATE', message: 'The answer was submitted after the grace period.' });
-    }
-
-    attempt.answers[input.questionId] = answer as any;
-    return { questionId: input.questionId, accepted: true, submittedAt: this.nowIso() };
+    return {
+      questionId: dto.questionId,
+      accepted: true,
+      submittedAt,
+    };
   }
 
-  finishAttempt(userId: number, attemptId: number) {
-    const attempt = this.store.getAttemptById(attemptId);
+  async finish(id: number, userId: number, isAdmin: boolean) {
+    const attempt = this.db.attempts.find(a => a.id === id);
     if (!attempt) {
-      throw new NotFoundException({ code: 'NOT_FOUND', message: 'Attempt not found.' });
-    }
-    if (attempt.userId !== userId) {
-      throw new ForbiddenException({ code: 'NOT_OWNER', message: 'You are not allowed to finish this attempt.' });
+      throw new NotFoundException({ statusCode: 404, error: 'Not Found', code: 'NOT_FOUND', message: 'Attempt not found' });
     }
 
-    this.applyLazyTimeout(attempt);
+    if (attempt.userId !== userId && !isAdmin) {
+      throw new ForbiddenException({ statusCode: 403, error: 'Forbidden', code: 'NOT_OWNER', message: 'Not owner of attempt' });
+    }
+
     if (attempt.status !== 'in_progress') {
-      throw new ConflictException({ code: 'ATTEMPT_ENDED', message: 'This attempt is already ended.' });
+      throw new ConflictException({
+        statusCode: 409,
+        error: 'Conflict',
+        code: 'ATTEMPT_ENDED',
+        message: 'Attempt has already ended',
+      });
     }
 
     attempt.status = 'finished';
-    attempt.finishedAt = this.nowIso();
-    this.recomputeAttemptMetrics(attempt);
-    return this.safeAttempt(attempt);
+    attempt.finishedAt = new Date().toISOString();
+    const evaluation = this.scoringService.evaluateAttempt(attempt);
+    attempt.score = evaluation.score;
+    attempt.maxScore = evaluation.maxScore;
+    attempt.percentage = evaluation.percentage;
+    attempt.readiness = evaluation.readiness;
+    this.db.saveToDisk();
+
+    return this.formatAttempt(attempt);
   }
 
-  getResults(userId: number, attemptId: number) {
-    const attempt = this.store.getAttemptById(attemptId);
+  async getResults(id: number, userId: number, isAdmin: boolean) {
+    const attempt = this.db.attempts.find(a => a.id === id);
     if (!attempt) {
-      throw new NotFoundException({ code: 'NOT_FOUND', message: 'Attempt not found.' });
-    }
-    if (attempt.userId !== userId) {
-      throw new ForbiddenException({ code: 'NOT_OWNER', message: 'You are not allowed to view this result.' });
+      throw new NotFoundException({ statusCode: 404, error: 'Not Found', code: 'NOT_FOUND', message: 'Attempt not found' });
     }
 
-    this.applyLazyTimeout(attempt);
+    if (attempt.userId !== userId && !isAdmin) {
+      throw new ForbiddenException({ statusCode: 403, error: 'Forbidden', code: 'NOT_OWNER', message: 'Not owner of attempt' });
+    }
+
+    this.checkLazyTimeout(attempt);
+
     if (attempt.status === 'in_progress') {
-      throw new ConflictException({ code: 'ATTEMPT_NOT_ENDED', message: 'This attempt is still in progress.' });
+      throw new ConflictException({
+        statusCode: 409,
+        error: 'Conflict',
+        code: 'ATTEMPT_NOT_ENDED',
+        message: 'Results requested while attempt is still in progress',
+      });
     }
 
-    const items = attempt.questions.map((question) => {
-      const submitted = attempt.answers[question.questionId];
-      const points = this.scoreQuestion(question, submitted);
-      const expected =
-        question.type === 'multiple_choice'
-          ? { correctChoiceId: (question as any).isCorrect ?? null }
-          : question.type === 'short_answer'
-            ? { expectedKeywords: question.expectedKeywords ?? [], requiredKeywordCount: question.requiredKeywordCount ?? 0 }
-            : { expectedOutput: question.expectedOutput ?? '' };
-
-      let explanation = 'Unanswered question: 0 points.';
-      if (question.type === 'multiple_choice') {
-        const correctChoiceId = (question as any).isCorrect ?? '';
-        explanation = submitted && submitted.choiceId === correctChoiceId ? 'Correct choice selected: 1 point.' : 'Incorrect choice selected: 0 points.';
-      }
-      if (question.type === 'short_answer') {
-        const keywords = question.expectedKeywords ?? [];
-        const required = question.requiredKeywordCount ?? 0;
-        const matched = submitted
-          ? keywords.reduce((count, keyword) => {
-              if (String(submitted.text ?? '').toLowerCase().includes(keyword.toLowerCase())) {
-                return count + 1;
-              }
-              return count;
-            }, 0)
-          : 0;
-        if (submitted && matched >= required) explanation = `Matched ${matched} of ${keywords.length} keywords: full credit.`;
-        else if (submitted && matched > 0 && matched < required) explanation = `Matched ${matched} of ${required} required keywords: half credit.`;
-        else if (submitted) explanation = `Matched 0 of ${required} required keywords: no credit.`;
-      }
-      if (question.type === 'code_output') {
-        explanation = submitted && String(submitted.text ?? '').trim() === String(question.expectedOutput ?? '').trim()
-          ? 'Output matches exactly: 1 point.'
-          : 'Output did not match expected output: 0 points.';
-      }
-
-      return {
-        questionId: question.questionId,
-        position: question.position,
-        prompt: question.prompt,
-        type: question.type,
-        submitted: submitted ?? null,
-        expected,
-        points,
-        maxPoints: 1,
-        explanation,
-      };
-    });
+    const evaluation = this.scoringService.evaluateAttempt(attempt);
 
     return {
       attemptId: attempt.id,
@@ -355,11 +326,11 @@ export class AttemptsService {
       status: attempt.status,
       startedAt: attempt.startedAt,
       finishedAt: attempt.finishedAt,
-      score: attempt.score,
-      maxScore: attempt.maxScore,
-      percentage: attempt.percentage,
-      readiness: attempt.readiness,
-      items,
+      score: evaluation.score,
+      maxScore: evaluation.maxScore,
+      percentage: evaluation.percentage,
+      readiness: evaluation.readiness,
+      items: evaluation.items,
     };
   }
 }

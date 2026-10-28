@@ -1,45 +1,41 @@
-import { Body, Controller, Get, Post } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Public } from '../common/public.decorator.js';
-import { CurrentUser } from '../common/current-user.decorator.js';
-import { AuthService, type LoginInput, type RegisterInput } from './auth.service.js';
+import { Controller, Post, Get, Body, HttpCode, HttpStatus, Inject } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { AuthService } from './auth.service.js';
+import { RegisterDto, LoginDto } from './dto/auth.dto.js';
+import { Public, CurrentUser, RequestUser } from './decorators/auth.decorators.js';
 
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(@Inject(AuthService) private authService: AuthService) {}
 
   @Public()
   @Post('register')
-  @ApiOperation({ summary: 'Register a new user' })
-  @ApiResponse({ status: 201, description: 'User registered.' })
-  @ApiResponse({ status: 400, description: 'Validation failed.' })
-  @ApiResponse({ status: 409, description: 'Username or email already used.' })
-  async register(@Body() dto: RegisterInput) {
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Register a new user account' })
+  @ApiResponse({ status: 201, description: 'User successfully registered' })
+  @ApiResponse({ status: 400, description: 'Validation failed' })
+  @ApiResponse({ status: 409, description: 'Username or email already taken' })
+  async register(@Body() dto: RegisterDto) {
     return this.authService.register(dto);
   }
 
   @Public()
   @Post('login')
-  @ApiOperation({ summary: 'Login and receive a JWT' })
-  @ApiResponse({ status: 200, description: 'Login successful.' })
-  async login(@Body() dto: LoginInput) {
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Log in with username or email' })
+  @ApiResponse({ status: 200, description: 'Login successful' })
+  @ApiResponse({ status: 401, description: 'Invalid credentials' })
+  async login(@Body() dto: LoginDto) {
     return this.authService.login(dto);
   }
 
   @Get('me')
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get the current logged-in user' })
-  @ApiResponse({ status: 200, description: 'Current user details.' })
-  async me(@CurrentUser() user: { userId: number; username: string }) {
-    const account = await this.authService.validateUser(user.userId);
-    return {
-      id: account.id,
-      username: account.username,
-      email: account.email,
-      displayName: account.displayName,
-      bio: account.bio,
-      createdAt: account.createdAt,
-    };
+  @ApiOperation({ summary: 'Get current user profile (includes email)' })
+  @ApiResponse({ status: 200, description: 'Current private user info' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async getMe(@CurrentUser() user: RequestUser) {
+    return this.authService.getMe(user.userId);
   }
 }

@@ -1,61 +1,79 @@
-import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  Param,
-  ParseIntPipe,
-  Patch,
-  Post,
-  Query,
-} from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { CurrentUser } from '../common/current-user.decorator.js';
-import { Public } from '../common/public.decorator.js';
-import { QuestionsService, type CreateQuestionInput, type QuestionFilterInput } from './questions.service.js';
+import { Controller, Get, Post, Patch, Delete, Body, Param, Query, ParseIntPipe, HttpCode, HttpStatus, Inject } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
+import { QuestionsService } from './questions.service.js';
+import { CreateQuestionDto, UpdateQuestionDto } from './dto/question.dto.js';
+import { CurrentUser, RequestUser } from '../auth/decorators/auth.decorators.js';
 
 @ApiTags('Questions')
+@ApiBearerAuth()
 @Controller('questions')
 export class QuestionsController {
-  constructor(private readonly questionsService: QuestionsService) {}
+  constructor(@Inject(QuestionsService) private questionsService: QuestionsService) {}
 
   @Get()
-  @Public()
   @ApiOperation({ summary: 'List questions with optional filters' })
-  @ApiResponse({ status: 200, description: 'Questions returned.' })
-  list(@Query() query: QuestionFilterInput) {
-    return this.questionsService.listQuestions(query);
+  @ApiQuery({ name: 'category', required: false })
+  @ApiQuery({ name: 'difficulty', required: false, enum: ['easy', 'medium', 'hard'] })
+  @ApiQuery({ name: 'type', required: false, enum: ['multiple_choice', 'short_answer', 'code_output'] })
+  @ApiQuery({ name: 'ownerId', required: false })
+  @ApiQuery({ name: 'search', required: false })
+  async findAll(
+    @CurrentUser() user: RequestUser,
+    @Query('category') category?: string,
+    @Query('difficulty') difficulty?: string,
+    @Query('type') type?: string,
+    @Query('ownerId') ownerId?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.questionsService.findAll(
+      {
+        category,
+        difficulty,
+        type,
+        ownerId: ownerId ? parseInt(ownerId, 10) : undefined,
+        search,
+      },
+      user.userId,
+    );
   }
 
   @Get(':id')
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get one question' })
-  @ApiResponse({ status: 200, description: 'Question returned.' })
-  getOne(@CurrentUser() user: { userId: number }, @Param('id', ParseIntPipe) id: number) {
-    return this.questionsService.getQuestion(user.userId, id);
+  @ApiOperation({ summary: 'Get question details' })
+  @ApiResponse({ status: 200, description: 'Question found' })
+  @ApiResponse({ status: 404, description: 'Question not found' })
+  async findOne(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser) {
+    return this.questionsService.findOne(id, user.userId);
   }
 
   @Post()
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Create a question' })
-  @ApiResponse({ status: 201, description: 'Question created.' })
-  create(@CurrentUser() user: { userId: number }, @Body() dto: CreateQuestionInput) {
-    return this.questionsService.createQuestion(user.userId, dto);
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Create question with type-specific validation' })
+  @ApiResponse({ status: 201, description: 'Question created' })
+  @ApiResponse({ status: 400, description: 'Validation failed' })
+  async create(@CurrentUser() user: RequestUser, @Body() dto: CreateQuestionDto) {
+    return this.questionsService.create(dto, user.userId, user.username);
   }
 
   @Patch(':id')
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Update a question' })
-  @ApiResponse({ status: 200, description: 'Question updated.' })
-  update(@CurrentUser() user: { userId: number }, @Param('id', ParseIntPipe) id: number, @Body() dto: Partial<CreateQuestionInput>) {
-    return this.questionsService.updateQuestion(user.userId, id, dto);
+  @ApiOperation({ summary: 'Update question (Owner or Admin only)' })
+  @ApiResponse({ status: 200, description: 'Question updated' })
+  @ApiResponse({ status: 403, description: 'Forbidden (NOT_OWNER)' })
+  @ApiResponse({ status: 404, description: 'Question not found' })
+  async update(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: RequestUser,
+    @Body() dto: UpdateQuestionDto,
+  ) {
+    return this.questionsService.update(id, dto, user.userId);
   }
 
   @Delete(':id')
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Delete a question' })
-  @ApiResponse({ status: 204, description: 'Question deleted.' })
-  delete(@CurrentUser() user: { userId: number }, @Param('id', ParseIntPipe) id: number) {
-    return this.questionsService.deleteQuestion(user.userId, id);
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Delete question (Owner or Admin only, protected against in-use)' })
+  @ApiResponse({ status: 204, description: 'Question deleted' })
+  @ApiResponse({ status: 403, description: 'Forbidden (NOT_OWNER)' })
+  @ApiResponse({ status: 409, description: 'Conflict (QUESTION_IN_USE)' })
+  async remove(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser) {
+    await this.questionsService.remove(id, user.userId);
   }
 }

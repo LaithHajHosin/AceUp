@@ -1,36 +1,34 @@
-import { Module, ValidationPipe } from '@nestjs/common';
-import { APP_PIPE } from '@nestjs/core';
-import { ConfigModule } from '@nestjs/config';
+/**
+ * Root NestJS Application Module
+ * Registers all feature modules and configures the global JWT Auth Guard.
+ */
+
+import { Module } from '@nestjs/common';
+import { APP_GUARD, Reflector } from '@nestjs/core';
+import { DatabaseModule } from './database/database.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { UsersModule } from './users/users.module.js';
 import { QuestionsModule } from './questions/questions.module.js';
 import { InterviewsModule } from './interviews/interviews.module.js';
 import { AttemptsModule } from './attempts/attempts.module.js';
-import { SessionsModule } from './sessions/sessions.module.js';
-import { AppController } from './app.controller.js';
-import { AppService } from './app.service.js';
+import { AdminModule } from './admin/admin.module.js';
+import { JwtAuthGuard } from './auth/guards/jwt-auth.guard.js';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true, envFilePath: ['.env', '.env.example'] }),
+    DatabaseModule,
     AuthModule,
     UsersModule,
     QuestionsModule,
     InterviewsModule,
     AttemptsModule,
-    SessionsModule,
+    AdminModule,
   ],
-  controllers: [AppController],
   providers: [
-    AppService,
+    Reflector,
     {
-      provide: APP_PIPE,
-      useValue: new ValidationPipe({
-        whitelist: true,
-        forbidNonWhitelisted: true,
-        transform: true,
-        stopAtFirstError: true,
-      }),
+      provide: APP_GUARD,
+      useClass: JwtAuthGuard,
     },
   ],
 })
